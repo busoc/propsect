@@ -7,15 +7,14 @@ function splitTM() {
     exit 432
   fi
 
-  workdir=$(realpath $2)
-  datadir=$(realpath $1)
-  shift 2
+  workdir=$(realpath $WORKDIR)
+  datadir=$(realpath $DATADIR)
 
   if [ ${#} -eq 0 ]; then
     return 0
   fi
 
-  parallel --will-cite --jobs 4 tmcat take -p {1} -d 24h $workdir/%P/%Y/%0J.dat $datadir ::: $@
+  parallel --will-cite --jobs $JOBS tmcat take -p {1} -d 24h $workdir/%P/%Y/%0J.dat $datadir ::: $@
   if [ $? -ne 0 ]; then
     return 1
   fi
@@ -79,7 +78,7 @@ shift $(($OPTIND - 1))
 
 case ${TYPE,,} in
   tm | pt | pathtm)
-    splitTM $DATADIR $WORKDIR $@
+    splitTM
     ;;
   pp | pd | pdh)
     splitPP $DATADIR $WORKDIR
