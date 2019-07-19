@@ -7,22 +7,31 @@ function splitTM() {
     exit 432
   fi
 
-  workdir=$(realpath $WORKDIR)
-  datadir=$(realpath $DATADIR)
-
   if [ ${#} -eq 0 ]; then
     return 0
   fi
 
-  parallel --will-cite --jobs $JOBS tmcat take -p {1} -d 24h $workdir/%P/%Y/%0J.dat $datadir ::: $@
+  parallel --will-cite --jobs $JOBS tmcat take -p {1} -d 24h $WORKDIR/%P/%Y/%0J.dat $DATADIR ::: $@
   if [ $? -ne 0 ]; then
     return 1
   fi
 }
 
 function splitPP() {
-  echo "segregate PP: not yet implemented"
-  exit 255
+  which ppcat &> /dev/null
+  if [ $? -ne 0 ]; then
+    echo "ppcat is not installed"
+    exit 432
+  fi
+
+  if [ ${#} -eq 0 ]; then
+    return 0
+  fi
+
+  parallel --will-cite --jobs $JOBS ppcat take -c {1} -n {/.} -d 24h $WORKDIR/%U/%Y/%0J.dat $DATADIR ::: $@
+  if [ $? -ne 0 ]; then
+    return 1
+  fi
 }
 
 function splitVMU() {
@@ -54,7 +63,7 @@ while getopts :t:d:w: OPT; do
       TYPE=$OPTARG
       ;;
     w)
-      WORKDIR=$OPTARG
+      WORKDIR=$(realpath $OPTARG)
       mkdir -p $WORKDIR
       if [ $? -ne 0 ]; then
         echo "$WORKDIR: fail to create directory"
@@ -62,7 +71,7 @@ while getopts :t:d:w: OPT; do
       fi
       ;;
     d)
-      DATADIR=$OPTARG
+      DATADIR=$(realpath $OPTARG)
       if [[ ! -d $DATADIR ]]; then
         echo "$DATADIR: not a directory"
         exit 43
@@ -78,10 +87,10 @@ shift $(($OPTIND - 1))
 
 case ${TYPE,,} in
   tm | pt | pathtm)
-    splitTM
+    splitTM $@
     ;;
   pp | pd | pdh)
-    splitPP $DATADIR $WORKDIR
+    splitPP $@
     ;;
   vmu | hr | hrd)
     splitVMU $DATADIR $WORKDIR
