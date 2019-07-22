@@ -8,10 +8,8 @@ BEGIN {
 	origins["e2"] = "MCC-M"
 	origins["e3"] = "HOSC"
 
-  if (datadir == "") {
-    datadir = "/tmp"
-  }
-  print(datadir)
+  datadir = datadir == "" ? "/tmp" : datadir
+  pretty = pretty == "" ? 0 : 1
 }
 {
   gsub(/"/, "", $3)
@@ -19,7 +17,9 @@ BEGIN {
     codes[$3] = source
 
     ori = substr($3, 0, 2)
-    file = origins[ori]
+    if (pretty != 0 ) {
+      file = origins[ori]
+    }
     if (file == "") {
       file = sprintf("umi_%s", ori)
     }
