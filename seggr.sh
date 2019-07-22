@@ -8,6 +8,7 @@ function splitTM() {
   fi
 
   if [ ${#} -eq 0 ]; then
+    echo "no apid given! abort..."
     return 0
   fi
 
@@ -25,6 +26,7 @@ function splitPP() {
   fi
 
   if [ ${#} -eq 0 ]; then
+    echo "no files given! abort..."
     return 0
   fi
 
@@ -52,7 +54,7 @@ TYPE=TM
 DATADIR=$TMPDIR
 WORKDIR=$TMPDIR
 
-while getopts :t:d:w: OPT; do
+while getopts :t:d:w:j: OPT; do
   case $OPT in
     j)
       if [ -n $OPTARG ] && [ $OPTARG -eq $OPTARG ] && [ $OPTARG -ne 0 ]; then
@@ -78,6 +80,8 @@ while getopts :t:d:w: OPT; do
       fi
       ;;
     *)
+      echo "unknown option $OPT"
+      echo
       echo "usage: $(basename $0) [-t type] [-d data] [-w working] [-j jobs] <arguments...>"
       exit 1
       ;;
