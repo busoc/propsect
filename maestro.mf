@@ -1,5 +1,5 @@
 .SHELL   = bash
-.ALL     = pth pdh
+.ALL     = purge pth pdh
 .DEFAULT = check
 
 .ABOUT = "split, merge and give stats of the archive"
@@ -25,6 +25,9 @@ lookup(help="look for commands in PATH"):
 		echo "broken dependencies: ${broken[@]}"
 		exit ${#broken[@]}
 	fi
+
+buildsite(help="make site from stats"):
+	echo "not yet implemented"
 
 pth(help="split archive by APID and generate report"):
 	%(seggr) -t TM -d %(tmdir) -w %(tmdat) 620 {906..907}

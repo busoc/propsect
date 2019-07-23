@@ -52,16 +52,26 @@ function doStatPPAll() {
   comma select 3,5: \
     | comma group 1:2 count 1 sum 3 \
     | comma format 4:size:iec > $FILE
+
+  if [ $? -ne 0 ]; then
+    echo "doStatPPAll failed"
+    exit 145
+  fi
 }
 
 function doStatPPDaily() {
   FILE=$WORKDIR/$DAILY
   rm -f $FILE
-  
+
   comma select 1,3,5: \
     | comma format 1:date:%Y/%j \
     | comma group 1:3 count 2 sum 4 \
-    | comma format 4:size:iec > $FILE
+    | comma format 5:size:iec > $FILE
+
+  if [ $? -ne 0 ]; then
+    echo "doStatPPDaily failed"
+    exit 145
+  fi
 }
 
 function statPP() {
