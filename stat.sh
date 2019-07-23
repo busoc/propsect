@@ -1,7 +1,11 @@
 #! /bin/bash
 
+ALL=stats.csv
+DAILY=daily.csv
+
 function doStatTMAll() {
-  FILE=$WORKDIR/stats.csv
+  FILE=$WORKDIR/$ALL
+  rm -f $FILE
 
   comma select 6,4,7 \
     | comma group 1 count 1 sum 2 sum 3 \
@@ -14,7 +18,8 @@ function doStatTMAll() {
 }
 
 function doStatTMDaily() {
-  FILE=$WORKDIR/daily.csv
+  FILE=$WORKDIR/$DAILY
+  rm -f $FILE
 
   comma select 6,1,4,7 \
     | comma format 2:date:%Y/%j \
@@ -34,10 +39,29 @@ function statTM() {
     exit 432
   fi
 
-  tmcat list -c $DATADIR | tee >(doStatTMAll) >(doStatTMDaily) > /dev/null
+  tmcat list -a -c $DATADIR | tee >(doStatTMAll) >(doStatTMDaily) > /dev/null
   if [ $? -ne 0 ]; then
     return 1
   fi
+}
+
+function doStatPPAll() {
+  FILE=$WORKDIR/$ALL
+  rm -f $FILE
+
+  comma select 3,5: \
+    | comma group 1:2 count 1 sum 3 \
+    | comma format 4:size:iec > $FILE
+}
+
+function doStatPPDaily() {
+  FILE=$WORKDIR/$DAILY
+  rm -f $FILE
+  
+  comma select 1,3,5: \
+    | comma format 1:date:%Y/%j \
+    | comma group 1:3 count 2 sum 4 \
+    | comma format 4:size:iec > $FILE
 }
 
 function statPP() {
@@ -47,8 +71,7 @@ function statPP() {
     exit 432
   fi
 
-  echo "stats PP: not yet implemented"
-  exit 255
+  ppcat list -a -c $DATADIR | tee >(doStatPPAll) >(doStatPPDaily) > /dev/null
 }
 
 function statVMU() {
@@ -71,11 +94,6 @@ WORKDIR=$TMPDIR
 
 while getopts :t:d:j: OPT; do
   case $OPT in
-    j)
-      if [ -n $OPTARG ] && [ $OPTARG -eq $OPTARG ] && [ $OPTARG -ne 0 ]; then
-        JOBS=$OPTARG
-      fi
-      ;;
     t)
       TYPE=$OPTARG
       ;;

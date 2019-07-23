@@ -55,11 +55,6 @@ check(help="check integrity of rt files created"):
 	rtcheck -csv %(tmdat) %(ppdat)
 	find -mindepth 1 -type f -name *dat -exec xxh '{}' \;
 
-upgrade(help="fetch the latest version for this maestro.mf"):
-	md5sum maestro.mf
-	cp ../../src/github.com/busoc/propsect/maestro.mf .
-	if [ $? -ne 0 ]; then
-		echo "%(TARGET): fail to upgrade maestro.mf"
-		exit 1
-	fi
-	md5sum maestro.mf
+purge(help="remove all files and directory", hazardous=true):
+	rm -rf %(ppdat)
+	rm -rf %(tmdat)
