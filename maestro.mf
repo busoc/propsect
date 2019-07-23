@@ -1,0 +1,65 @@
+.SHELL   = bash
+.ALL     = pth pdh
+.DEFAULT = check
+
+.ABOUT = "split, merge and give stats of the archive"
+
+include vars.mf
+
+commands= tmcat ppcat comma parallel
+
+lookup(help="look for commands in PATH"):
+	declare -a broken
+	for cmd in %(commands); do
+		which $cmd > /dev/null
+		code=$?
+		if [ $code -ne 0 ]; then
+			STATUS='\x1b[38;5;1m[ KO ]\x1b[0m'
+			broken+=($cmd)
+		else
+			STATUS='\x1b[38;5;2m[ OK ]\x1b[0m'
+		fi
+		echo -e "$STATUS $cmd"
+	done
+	if [ ${#broken[@]} -gt 0 ]; then
+		echo "broken dependencies: ${broken[@]}"
+		exit ${#broken[@]}
+	fi
+
+pth(help="split archive by APID and generate report"):
+	%(seggr) -t TM -d %(tmdir) -w %(tmdat) 620 {906..907}
+	if [ $? -ne 0 ]; then
+		exit 125
+	fi
+	%(stat) -t TM -d %(tmdat)
+	if [ $? -ne 0 ]; then
+		exit 124
+	fi
+
+pdh(help="split archive by UMI and generate report"):
+	%(seggr) -t PP -d %(ppdir) -w %(ppdat) $(ls *.csv)
+	if [ $? -ne 0 ]; then
+		exit 125
+	fi
+	%(stat) -t PP -d %(ppdat)
+	if [ $? -ne 0 ]; then
+		exit 124
+	fi
+
+umicount(help="count number of umi code in listing files"):
+	for file in $(ls *.csv); do
+		echo "codes: $(wc -l $file) $(md5sum $file)"
+	done
+
+check(help="check integrity of rt files created"):
+	rtcheck -csv %(tmdat) %(ppdat)
+	find -mindepth 1 -type f -name *dat -exec xxh '{}' \;
+
+upgrade(help="fetch the latest version for this maestro.mf"):
+	md5sum maestro.mf
+	cp ../../src/github.com/busoc/propsect/maestro.mf .
+	if [ $? -ne 0 ]; then
+		echo "%(TARGET): fail to upgrade maestro.mf"
+		exit 1
+	fi
+	md5sum maestro.mf
