@@ -26,6 +26,12 @@ lookup(help="look for commands in PATH"):
 		exit ${#broken[@]}
 	fi
 
+keys(help="copy ssh key to host(s)", local=true):
+	if [[ ! -f %(lockey) ]]; then
+		ssh-keygen -t %(alg) -b %(bitsize) -f %(lockey) -N '%(passphrase)'
+	fi
+	parallel --jobs 10 ssh-copy-id -i %(lockey) %(user)@{1} ::: %(hosts)
+
 status(help="listing per year"):
 	mkdir -p %(bdsr)
 	for pid in %(pids); do
