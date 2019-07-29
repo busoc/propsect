@@ -26,11 +26,19 @@ lookup(help="look for commands in PATH"):
 		exit ${#broken[@]}
 	fi
 
+status(help="listing per year"):
+	mkdir -p %(bdsr)
+	for pid in %(pids); do
+		mkdir -p %(bdsr)/$pid
+	done
+	parallel --jobs 12 rtcheck -csv %(tmdat)/{1}/{2} '>' %(bdsr)/{1}/{2}.csv ::: %(pids) ::: {2008..2020} &> /dev/null
+	find %(bdsr) -type f -empty -delete
+
 buildsite(help="make site from stats"):
 	echo "not yet implemented"
 
 pth(help="split archive by APID and generate report"):
-	%(seggr) -t TM -d %(tmdir) -w %(tmdat) 620 {906..907}
+	%(seggr) -t TM -d %(tmdir) -w %(tmdat) %(pids)
 	if [ $? -ne 0 ]; then
 		exit 125
 	fi
@@ -61,3 +69,4 @@ check(help="check integrity of rt files created"):
 purge(help="remove all files and directory", hazardous=true):
 	rm -rf %(ppdat)
 	rm -rf %(tmdat)
+	rm -rf %(bdsr)
