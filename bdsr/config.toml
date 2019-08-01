@@ -1,0 +1,34 @@
+addr      = "http://localhost:1313/alt/"
+brand     = "bdsr"
+title     = "B.USOC Data Storage Report"
+author    = "BUSOC"
+canonical = true
+
+[[data]]
+location = "list.csv"
+template = "list"
+url      = "/"
+
+[[data]]
+location = "620"
+title    = "RESPONSE"
+template = "report"
+copy     = true
+
+[[data]]
+location = "906"
+title    = "DHPU"
+template = "report"
+copy     = true
+
+[[data]]
+location = "907"
+title    = "MMIA"
+template = "report"
+copy     = true
+
+[[data]]
+location = "908"
+title    = "MXGS"
+template = "report"
+copy     = true

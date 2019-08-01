@@ -1,0 +1,57 @@
+{{define "main"}}
+<header class="my-4">
+  <h1 class="border-bottom">{{.File.Title}}</h1>
+  <aside class="card-deck my-3">
+    <div class="card rounded-0">
+      <h5 class="card-header">Files</h5>
+      <div class="card-body text-center"><strong>1000</strong></div>
+    </div>
+    <div class="card rounded-0">
+      <h5 class="card-header">Size</h5>
+      <div class="card-body text-center"><strong>{{100000. | sizefmt}}</strong></div>
+    </div>
+    <div class="card rounded-0">
+      <h5 class="card-header">Packets</h5>
+      <div class="card-body text-center"><strong>1000</strong></div>
+    </div>
+    <div class="card rounded-0">
+      <h5 class="card-header">Corrupted</h5>
+      <div class="card-body text-center"><strong>1000</strong></div>
+    </div>
+  </aside>
+</header>
+{{template "paginate.html" .}}
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>file</th>
+      <th>size</th>
+      <th>last modified</th>
+      <th>packets</th>
+      <th>hash</th>
+      <th>status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .File.Records}}
+    <tr>
+      <td>{{index . 6}}</td>
+      <td>
+        {{with $size := index . 1}}
+          {{$size | sizefmt}}
+        {{end}}
+      </td>
+      <td>{{index . 3}}</td>
+      <td>{{index . 4}}</td>
+      <td>{{index . 5}}</td>
+      <td>
+        {{with $state := index . 0}}
+        {{if eq $state "ok"}}-{{else}}corrupted{{end}}
+        {{end}}
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{template "paginate.html" .}}
+{{end}}

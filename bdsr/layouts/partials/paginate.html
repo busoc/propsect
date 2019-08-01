@@ -1,0 +1,12 @@
+{{$files := .Site.Neighbours .File}}
+{{if $files}}
+<nav>
+  <ul class="pagination pagination-sm justify-content-center">
+    {{range $files}}
+    <li class="page-item {{if eq .URL $.File.URL}}active{{end}}">
+      <a class="page-link rounded-0" href="{{.URL}}">{{.Base}}</a>
+    </li>
+    {{end}}
+  </ul>
+</nav>
+{{end}}
