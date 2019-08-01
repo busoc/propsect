@@ -58,10 +58,10 @@ pth(help="split archive by APID and generate report"):
 	fi
 
 pdh(help="split archive by UMI and generate report"):
-if [[ ! -d %(ppdir) ]]; then
-	echo "%(tmdir): not a directory"
-	exit 123
-fi
+	if [[ ! -d %(ppdir) ]]; then
+		echo "%(tmdir): not a directory"
+		exit 123
+	fi
 	%(seggr) -t PP -d %(ppdir) -w %(ppdat) $(ls *.csv)
 	if [ $? -ne 0 ]; then
 		exit 125
