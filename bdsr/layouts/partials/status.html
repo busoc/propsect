@@ -1,0 +1,33 @@
+{{define "status"}}
+{{ $records := .}}
+<aside class="card-deck my-3">
+  <div class="card rounded-0">
+    <h5 class="card-header">Files</h5>
+    <div class="card-body text-center">
+      <strong>{{len $records}}</strong>
+    </div>
+  </div>
+  <div class="card rounded-0">
+    <h5 class="card-header">Size</h5>
+    <div class="card-body text-center">
+      {{with $sum := sum $records 1}}
+        <strong>{{$sum | sizefmt}}</strong>
+      {{end}}
+    </div>
+  </div>
+  <div class="card rounded-0">
+    <h5 class="card-header">Packets</h5>
+    <div class="card-body text-center">
+      {{with $sum := sum $records 4}}
+        <strong>{{$sum}}</strong>
+      {{end}}
+    </div>
+  </div>
+  <div class="card rounded-0">
+    <h5 class="card-header">Corrupted</h5>
+    <div class="card-body text-center">
+			<strong>{{countif $records "invalid" 0}}</strong>
+    </div>
+  </div>
+</aside>
+{{end}}
