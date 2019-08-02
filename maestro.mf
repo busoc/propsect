@@ -6,7 +6,7 @@
 
 include commons.mf
 
-commands= tmcat ppcat comma parallel
+commands= tmcat ppcat comma parallel xxh csv2html
 
 lookup(help="look for commands in PATH"):
 	declare -a broken
