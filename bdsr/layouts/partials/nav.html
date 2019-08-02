@@ -2,6 +2,24 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
   <div class="container">
      <a class="navbar-brand text-uppercase" href="{{.Site.BaseURL}}">{{.Site.Brand}}</a>
+     {{if .Site.Menus}}
+     <div class="collapse navbar-collapse">
+       <ul class="navbar-nav ml-auto">
+         {{range .Site.Menus}}
+         <li class="nav-item {{if .Menus}}dropdown{{end}}">
+           <a class="nav-link {{if .Menus}}dropdown-toggle{{end}}" href="{{.Link}}" role="button" data-toggle="dropdown">{{.Label}}</a>
+           {{if .Menus}}
+           <div class="dropdown-menu">
+             {{range .Menus}}
+             <a class="dropdown-item" href="{{.Link}}">{{.Label}}</a>
+             {{end}}
+           </div>
+           {{end}}
+         </li>
+         {{end}}
+       </ul>
+     </div>
+     {{end}}
   </div>
 </nav>
 {{end}}

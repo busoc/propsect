@@ -4,10 +4,41 @@ title     = "B.USOC Data Storage Report"
 author    = "BUSOC"
 canonical = true
 
+[[menu]]
+label = "ASIM"
+link  = "#"
+menu  = [
+  {label = "DHPU", link=""},
+  {label = "MMIA", link=""},
+  {label = "MXGS", link=""},
+]
+
+[[menu]]
+label = "SOLAR"
+link  = "#"
+
+[[menu]]
+label = "FSL"
+link  = "#"
+
+[[menu]]
+label = "PCDF"
+link  = "#"
+
 [[data]]
 location = "list.csv"
 template = "list"
 url      = "/"
+
+[[data]]
+location = "941"
+title    = "PCDF"
+template = "report"
+
+[[data]]
+location = "943"
+title    = "PCDF"
+template = "report"
 
 [[data]]
 location = "620"
