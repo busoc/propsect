@@ -24,11 +24,15 @@ link  = "#"
 [[menu]]
 label = "PCDF"
 link  = "#"
+menu  = [
+  {label = "PCDF-941", link=""},
+  {label = "PCDF-943", link=""},
+]
 
-[[data]]
-location = "list.csv"
-template = "list"
-url      = "/"
+# [[data]]
+# location = "list.csv"
+# template = "list"
+# url      = "/"
 
 [[data]]
 location = "941"

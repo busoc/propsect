@@ -1,5 +1,6 @@
 {{$files := .Site.Neighbours .File}}
-{{if $files}}
+{{$size := len $files}}
+{{if gt $size 1}}
 <nav>
   <ul class="pagination pagination-sm justify-content-center">
     {{range $files}}
