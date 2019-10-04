@@ -8,167 +8,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/busoc/prospect"
 	"github.com/busoc/rt"
 	"github.com/midbel/toml"
 )
-
-type Meta struct {
-	Id   int    `xml:"-"`
-	Accr string `toml:"acronym" xml:",comment"`
-
-	Name       string    `toml:"experiment" xml:"experimentName"`
-	Starts     time.Time `toml:"dtstart" xml:"startTime"`
-	Ends       time.Time `toml:"dtend" xml:"endTime"`
-	Domains    []string  `toml:"fields" xml:"researchField"`
-	Increments []string  `xml:"increments>increment"`
-	People     []string  `toml:"coordinators" xml:"scienceTeamCoordinators>coordinatorName,omitempty"`
-	Payloads   []Payload `toml:"payload" xml:"payloads>payload"`
-}
-
-func (m *Meta) MarshalXML(e *xml.Encoder, _ xml.StartElement) error {
-	e.EncodeElement(m.Name, startElement("experimentName"))
-	e.EncodeElement(strings.Join(m.Domains, ", "), startElement("researchField"))
-	cs := struct {
-		Values []string `xml:"coordinatorName"`
-	}{
-		Values: m.People,
-	}
-	e.EncodeElement(cs, startElement("scienceTeamCoordinators"))
-	ps := struct {
-		Values []Payload `xml:"payload"`
-	}{
-		Values: m.Payloads,
-	}
-	e.EncodeElement(ps, startElement("payloads"))
-	e.EncodeElement(m.Starts.UTC(), startElement("startTime"))
-	e.EncodeElement(m.Ends.UTC(), startElement("endTime"))
-	is := struct {
-		Values []string `xml:"increment"`
-	}{
-		Values: m.Increments,
-	}
-	e.EncodeElement(is, startElement("increments"))
-
-	return nil
-}
-
-type Payload struct {
-	XMLName xml.Name `toml:"-" xml:"payload"`
-	Accr    string   `toml:"acronym" xml:"-"`
-	Name    string   `xml:"payloadName"`
-	Class   int      `xml:"payloadClass"`
-}
-
-type Mime struct {
-	Extensions []string
-	Type       string `toml:"type"`
-}
-
-func (m *Mime) Has(ext string) (string, bool) {
-	if !sort.StringsAreSorted(m.Extensions) {
-		sort.Strings(m.Extensions)
-	}
-	var (
-		x    = sort.SearchStrings(m.Extensions, ext)
-		ok   = x < len(m.Extensions) && m.Extensions[x] == ext
-		mime string
-	)
-	if ok {
-		mime = m.Type
-	}
-	return mime, ok
-}
-
-type Parameter struct {
-	Name  string
-	Value string
-}
-
-type Data struct {
-	Experiment string `toml:"-"`
-	Rootdir    string `toml:"rootdir"`
-	File       string `toml:"datadir"`
-	Level      int
-	Source     string
-	Integrity  string
-	Type       string
-	Model      string
-	Mimes      []Mime `toml:"mimetype"`
-	Crews      []string
-	Owner      string
-	Increments []string
-
-	Path     string    `toml:"-"`
-	Sum      string    `toml:"-"`
-	AcqTime  time.Time `toml:"-"`
-	ModTime  time.Time `toml:"-"`
-	Mimetype string    `toml:"-"`
-
-	Parameters []Parameter `toml:"-" xml:"experimentSpecificMetadata>parameter"`
-}
-
-func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
-	e.EncodeElement(d.Experiment, startElement("experimentName"))
-	e.EncodeElement(d.Model, startElement("model"))
-	e.EncodeElement(d.Source, startElement("dataSource"))
-	e.EncodeElement(d.Owner, startElement("dataOwner"))
-	e.EncodeElement(d.AcqTime, startElement("acquisitionTime"))
-	e.EncodeElement(d.ModTime, startElement("creationTime"))
-	is := struct {
-		Values []string `xml:"increment"`
-	}{
-		Values: d.Increments,
-	}
-	e.EncodeElement(is, startElement("increments"))
-	cs := struct {
-		Values []string `xml:"crewMemberName"`
-	}{
-		Values: d.Crews,
-	}
-	e.EncodeElement(cs, startElement("involvedCrew"))
-	e.EncodeElement(d.Level, startElement("processingLevel"))
-	e.EncodeElement(d.Type, startElement("productType"))
-	e.EncodeElement(d.Mimetype, startElement("fileFormat"))
-	e.EncodeElement(d.Path, startElement("relativePath"))
-	xs := struct {
-		Method string `xml:"method"`
-		Value  string `xml:"value"`
-	}{
-		Method: d.Integrity,
-		Value:  d.Sum,
-	}
-	e.EncodeElement(xs, startElement("integrity"))
-	ps := struct {
-		Values []Parameter `xml:"parameter"`
-	}{
-		Values: d.Parameters,
-	}
-	e.EncodeElement(ps, startElement("experimentSpecificMetadata"))
-
-	return nil
-}
-
-func startElement(label string) xml.StartElement {
-	n := xml.Name{Local: label}
-	return xml.StartElement{Name: n}
-}
-
-func (d Data) guessType(ext string) string {
-	mime := "application/octet-stream"
-	for _, m := range d.Mimes {
-		t, ok := m.Has(ext)
-		if ok {
-			mime = t
-			break
-		}
-	}
-	return mime
-}
 
 func main() {
 	count := flag.Int("n", 0, "files")
@@ -183,8 +30,8 @@ func main() {
 
 	d := struct {
 		Rootdir string
-		Meta
-		Dataset []Data
+		prospect.Meta
+		Dataset []prospect.Data
 	}{}
 	if err := toml.NewDecoder(r).Decode(&d); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -210,8 +57,8 @@ func main() {
 	}
 }
 
-func walkDataset(d Data) <-chan Data {
-	queue := make(chan Data)
+func walkDataset(d prospect.Data) <-chan prospect.Data {
+	queue := make(chan prospect.Data)
 
 	go func() {
 		defer close(queue)
@@ -241,13 +88,13 @@ func walkDataset(d Data) <-chan Data {
 
 			x.File = filepath.Join(x.Rootdir, strings.TrimPrefix(p, rootdir))
 			x.Path = x.File
-			x.Mimetype = x.guessType(filepath.Ext(p))
+			x.Mimetype = x.GuessType(filepath.Ext(p))
 			x.AcqTime = timeFromFile(p)
 			x.ModTime = i.ModTime().UTC()
 			x.Sum = fmt.Sprintf("%x", digest.Sum(nil))
-			x.Parameters = append(x.Parameters, Parameter{Name: "file.num", Value: fmt.Sprintf("%d", count)})
-			x.Parameters = append(x.Parameters, Parameter{Name: "file.size", Value: fmt.Sprintf("%d", size)})
-			x.Parameters = append(x.Parameters, Parameter{Name: "file.corrupted", Value: fmt.Sprintf("%t", corrupted)})
+			x.Parameters = append(x.Parameters, prospect.Parameter{Name: "file.num", Value: fmt.Sprintf("%d", count)})
+			x.Parameters = append(x.Parameters, prospect.Parameter{Name: "file.size", Value: fmt.Sprintf("%d", size)})
+			x.Parameters = append(x.Parameters, prospect.Parameter{Name: "file.corrupted", Value: fmt.Sprintf("%t", corrupted)})
 
 			queue <- x
 			return nil
@@ -299,7 +146,7 @@ func readFile(rs io.Reader, buf []byte) (int64, int64, bool) {
 	}
 }
 
-func marshalData(dir string, d Data) error {
+func marshalData(dir string, d prospect.Data) error {
 	file := filepath.Join(dir, d.File)
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
@@ -312,7 +159,7 @@ func marshalData(dir string, d Data) error {
 	return encodeData(w, d)
 }
 
-func marshalMeta(dir string, m Meta) error {
+func marshalMeta(dir string, m prospect.Meta) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
@@ -324,12 +171,12 @@ func marshalMeta(dir string, m Meta) error {
 	return encodeMeta(w, m)
 }
 
-func encodeMeta(w io.Writer, m Meta) error {
+func encodeMeta(w io.Writer, m prospect.Meta) error {
 	doc := struct {
 		XMLName  xml.Name `xml:"http://eusoc.upm.es/SDC/Experiments/1 experiment"`
 		Instance string   `xml:"xmlns:xsi,attr"`
 		Location string   `xml:"xsi:schemaLocation,attr"`
-		Meta     *Meta
+		Meta     *prospect.Meta
 	}{
 		Meta:     &m,
 		Instance: "http://www.w3.org/2001/XMLSchema-instance",
@@ -338,12 +185,12 @@ func encodeMeta(w io.Writer, m Meta) error {
 	return encodeDocument(w, doc)
 }
 
-func encodeData(w io.Writer, d Data) error {
+func encodeData(w io.Writer, d prospect.Data) error {
 	doc := struct {
 		XMLName  xml.Name `xml:"http://eusoc.upm.es/SDC/Metadata/1 metadata"`
 		Instance string   `xml:"xmlns:xsi,attr"`
 		Location string   `xml:"xsi:schemaLocation,attr"`
-		Data     *Data
+		Data     *prospect.Data
 	}{
 		Data:     &d,
 		Instance: "http://www.w3.org/2001/XMLSchema-instance",
