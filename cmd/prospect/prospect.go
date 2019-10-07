@@ -7,12 +7,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/busoc/prospect"
-	"github.com/busoc/rt"
 	"github.com/midbel/toml"
 )
 
@@ -67,49 +63,6 @@ func processData(d prospect.Data) error {
 		}
 	}
 	return nil
-}
-
-func timeFromFile(file string) time.Time {
-	var (
-		parts = make([]int, 3)
-		dir   = filepath.Dir(file)
-		base  = filepath.Base(file)
-		when  time.Time
-	)
-	for i := len(parts) - 1; i >= 0; i-- {
-		d, f := filepath.Split(dir)
-		x, err := strconv.Atoi(f)
-		if err != nil {
-			return when
-		}
-		parts[i] = x
-		dir = filepath.Dir(d)
-	}
-	when = when.AddDate(parts[0]-1, 0, parts[1]).Add(time.Duration(parts[2]) * time.Hour)
-	if x := strings.Index(base, "_"); x >= 0 {
-		base = base[x+1:]
-		if x = strings.Index(base, "_"); x >= 0 {
-			x, err := strconv.Atoi(base[:x])
-			if err == nil {
-				when = when.Add(time.Duration(x) * time.Minute)
-			}
-		}
-	}
-	return when.UTC()
-}
-
-func readFile(rs io.Reader, buf []byte) (int64, int64, bool) {
-	var size int64
-	for i := 0; ; i++ {
-		switch n, err := rs.Read(buf); err {
-		case nil:
-			size += int64(n)
-		case io.EOF, rt.ErrInvalid:
-			return int64(i), size, err == rt.ErrInvalid
-		default:
-			return 0, 0, true
-		}
-	}
 }
 
 func marshalData(dir string, d prospect.Data) error {
