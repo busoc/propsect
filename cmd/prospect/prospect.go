@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"encoding/xml"
 	"flag"
 	"fmt"
@@ -55,6 +54,9 @@ func main() {
 
 func processData(d prospect.Data) error {
 	for _, p := range d.Plugins {
+		if p.Integrity == "" {
+			p.Integrity = d.Integrity
+		}
 		_, err := p.Open()
 		switch err {
 		case prospect.ErrSkip:
@@ -65,52 +67,6 @@ func processData(d prospect.Data) error {
 		}
 	}
 	return nil
-}
-
-func walkDataset(d prospect.Data) <-chan prospect.Data {
-	queue := make(chan prospect.Data)
-
-	go func() {
-		defer close(queue)
-		var (
-			rootdir = d.File
-			digest  = sha256.New()
-			buf     = make([]byte, 8<<20)
-		)
-		filepath.Walk(rootdir, func(p string, i os.FileInfo, err error) error {
-			defer digest.Reset()
-			if err != nil {
-				return err
-			}
-			if i.IsDir() {
-				return nil
-			}
-
-			r, err := os.Open(p)
-			if err != nil {
-				return nil
-			}
-			defer r.Close()
-			count, size, corrupted := readFile(io.TeeReader(rt.NewReader(r), digest), buf)
-
-			x := d
-			x.Parameters = x.Parameters[:0]
-
-			x.File = filepath.Join(x.Rootdir, strings.TrimPrefix(p, rootdir))
-			x.Path = x.File
-			x.Mimetype = x.GuessType(filepath.Ext(p))
-			x.AcqTime = timeFromFile(p)
-			x.ModTime = i.ModTime().UTC()
-			x.Sum = fmt.Sprintf("%x", digest.Sum(nil))
-			x.Parameters = append(x.Parameters, prospect.Parameter{Name: "file.num", Value: fmt.Sprintf("%d", count)})
-			x.Parameters = append(x.Parameters, prospect.Parameter{Name: "file.size", Value: fmt.Sprintf("%d", size)})
-			x.Parameters = append(x.Parameters, prospect.Parameter{Name: "file.corrupted", Value: fmt.Sprintf("%t", corrupted)})
-
-			queue <- x
-			return nil
-		})
-	}()
-	return queue
 }
 
 func timeFromFile(file string) time.Time {

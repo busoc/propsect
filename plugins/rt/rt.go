@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/md5"
 	"crypto/sha256"
+	"crypto/sha512"
 	"fmt"
 	"hash"
 	"io"
@@ -23,17 +25,27 @@ const (
 )
 
 type module struct {
-	dir     string
-	pattern string
-	buf     []byte
-	digest  hash.Hash
+	cfg prospect.Config
+
+	buf    []byte
+	digest hash.Hash
 }
 
-func New() prospect.Module {
-	return module{
-		buf:    make([]byte, 8<<20),
-		digest: sha256.New(),
+func New(cfg prospect.Config) prospect.Module {
+	m := module{
+		cfg: cfg,
+		buf: make([]byte, 8<<20),
 	}
+	switch strings.ToLower(cfg.Integrity) {
+	case "sha256", "sha-256":
+		m.digest = sha256.New()
+	case "sha512", "sha-512":
+		m.digest = sha512.New512_256()
+	case "md5":
+		m.digest = md5.New()
+	default:
+	}
+	return m
 }
 
 func (m module) Process() (prospect.FileInfo, error) {

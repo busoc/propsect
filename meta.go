@@ -15,9 +15,14 @@ var (
 )
 
 type FileInfo struct {
-	File    string
-	Sum     string
-	Size    int
+	File string
+	Type string
+	Mime string
+
+	Integrity string
+	Sum       string
+	Size      int
+
 	ModTime time.Time
 	AcqTime time.Time
 
@@ -28,17 +33,18 @@ type Module interface {
 	Process() (FileInfo, error)
 }
 
-type Plugin struct {
-	Module   string
-	Location string
-	Type     string
+type Config struct {
+	Integrity string
+	Module    string
+	Location  string
+	Type      string
 }
 
-func (p Plugin) Open() (Module, error) {
-	if p.Module == "" {
+func (c Config) Open() (Module, error) {
+	if c.Module == "" {
 		return nil, ErrSkip
 	}
-	g, err := plugin.Open(p.Module)
+	g, err := plugin.Open(c.Module)
 	if err != nil {
 		return nil, err
 	}
@@ -46,11 +52,11 @@ func (p Plugin) Open() (Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn, ok := sym.(func() Module)
+	fn, ok := sym.(func(Config) Module)
 	if !ok {
-		return nil, fmt.Errorf("%s: invalid plugin - invalid signture (%T)", p.Module, sym)
+		return nil, fmt.Errorf("%s: invalid plugin - invalid signture (%T)", c.Module, sym)
 	}
-	return fn(), nil
+	return fn(c), nil
 }
 
 type Parameter struct {
@@ -138,15 +144,9 @@ type Data struct {
 	Crews      []string
 	Owner      string
 	Increments []string
-	Plugins    []Plugin `toml:"data"`
+	Plugins    []Config `toml:"data"`
 
-	Path     string    `toml:"-"`
-	Sum      string    `toml:"-"`
-	AcqTime  time.Time `toml:"-"`
-	ModTime  time.Time `toml:"-"`
-	Mimetype string    `toml:"-"`
-
-	Parameters []Parameter `toml:"-"`
+	Info FileInfo
 }
 
 func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
@@ -154,8 +154,8 @@ func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
 	e.EncodeElement(d.Model, startElement("model"))
 	e.EncodeElement(d.Source, startElement("dataSource"))
 	e.EncodeElement(d.Owner, startElement("dataOwner"))
-	e.EncodeElement(d.AcqTime, startElement("acquisitionTime"))
-	e.EncodeElement(d.ModTime, startElement("creationTime"))
+	e.EncodeElement(d.Info.AcqTime, startElement("acquisitionTime"))
+	e.EncodeElement(d.Info.ModTime, startElement("creationTime"))
 	is := struct {
 		Values []string `xml:"increment"`
 	}{
@@ -169,21 +169,24 @@ func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
 	}
 	e.EncodeElement(cs, startElement("involvedCrew"))
 	e.EncodeElement(d.Level, startElement("processingLevel"))
-	e.EncodeElement(d.Type, startElement("productType"))
-	e.EncodeElement(d.Mimetype, startElement("fileFormat"))
-	e.EncodeElement(d.Path, startElement("relativePath"))
+	if d.Info.Type == "" {
+		d.Info.Type = d.Type
+	}
+	e.EncodeElement(d.Info.Type, startElement("productType"))
+	e.EncodeElement(d.Info.Mime, startElement("fileFormat"))
+	e.EncodeElement(d.Info.File, startElement("relativePath"))
 	xs := struct {
 		Method string `xml:"method"`
 		Value  string `xml:"value"`
 	}{
-		Method: d.Integrity,
-		Value:  d.Sum,
+		Method: d.Info.Integrity,
+		Value:  d.Info.Sum,
 	}
 	e.EncodeElement(xs, startElement("integrity"))
 	ps := struct {
 		Values []Parameter `xml:"parameter"`
 	}{
-		Values: d.Parameters,
+		Values: d.Info.Parameters,
 	}
 	e.EncodeElement(ps, startElement("experimentSpecificMetadata"))
 
