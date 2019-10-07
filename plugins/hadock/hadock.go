@@ -4,6 +4,14 @@ import (
 	"github.com/busoc/prospect"
 )
 
+const (
+	fileChannel  = "file.channel"
+	fileSource   = "file.source"
+	fileUPI      = "file.upi"
+	fileInstance = "file.instance"
+	fileMode     = "file.mode"
+)
+
 type module struct {
 	dir     string
 	pattern string

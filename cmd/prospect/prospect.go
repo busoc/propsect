@@ -41,10 +41,10 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 		}
 	}
-	// if err := marshalMeta(d.Rootdir, d.Meta); err != nil {
-	// 	fmt.Fprintln(os.Stderr, err)
-	// 	os.Exit(2)
-	// }
+	if err := marshalMeta(d.Rootdir, d.Meta); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	// for i := range d.Dataset {
 	// 	for ds := range walkDataset(d.Dataset[i]) {
 	// 		ds.Experiment = d.Meta.Name

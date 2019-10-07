@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"fmt"
+	"hash"
 	"io"
 	"os"
 	"path/filepath"
@@ -14,17 +15,29 @@ import (
 	"github.com/busoc/rt"
 )
 
+const (
+	fileDuration  = "file.duration"
+	fileRecord    = "file.numrec"
+	fileSize      = "file.size"
+	fileCorrupted = "file.corrupted"
+)
+
 type module struct {
 	dir     string
 	pattern string
+	buf     []byte
+	digest  hash.Hash
 }
 
 func New() prospect.Module {
-	return nil
+	return module{
+		buf:    make([]byte, 8<<20),
+		digest: sha256.New(),
+	}
 }
 
 func (m module) Process() (prospect.FileInfo, error) {
-
+	return m.process("")
 }
 
 func (m module) process(file string) (prospect.FileInfo, error) {
@@ -34,12 +47,14 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 	if err != nil {
 		return i, err
 	}
-	defer r.Close()
-	digest := sha256.New()
+	defer func() {
+		r.Close()
+		m.digest.Reset()
+	}()
 
-	ps, err := readFile(io.TeeReader(rt.NewReader(r), digest))
+	ps, err := m.readFile(io.TeeReader(rt.NewReader(r), m.digest))
 	if err == nil {
-		i.Sum = fmt.Sprintf("%x", digest.Sum(nil))
+		i.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
 		i.AcqTime = timeFromFile(file)
 		i.Parameters = ps
 
@@ -51,20 +66,18 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 	return i, err
 }
 
-func readFile(rs io.Reader) ([]prospect.Parameter, error) {
-	var (
-		size int64
-		buf  = make([]byte, 8<<20)
-	)
+func (m module) readFile(rs io.Reader) ([]prospect.Parameter, error) {
+	var size int64
 	for i := 0; ; i++ {
-		switch n, err := rs.Read(buf); err {
+		switch n, err := rs.Read(m.buf); err {
 		case nil:
 			size += int64(n)
 		case io.EOF, rt.ErrInvalid:
 			ps := []prospect.Parameter{
-				{Name: "file.numrec", Value: fmt.Sprintf("%d", i)},
-				{Name: "file.size", Value: fmt.Sprintf("%d", size)},
-				{Name: "file.corrupted", Value: fmt.Sprintf("%d", err == rt.ErrInvalid)},
+				{Name: fileDuration, Value: "300s"},
+				{Name: fileRecord, Value: fmt.Sprintf("%d", i)},
+				{Name: fileSize, Value: fmt.Sprintf("%d", size)},
+				{Name: fileCorrupted, Value: fmt.Sprintf("%d", err == rt.ErrInvalid)},
 			}
 			return ps, nil
 		default:
