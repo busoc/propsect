@@ -23,7 +23,11 @@ func New() prospect.Module {
 	return nil
 }
 
-func (m module) Process(file string) (prospect.FileInfo, error) {
+func (m module) Process() (prospect.FileInfo, error) {
+
+}
+
+func (m module) process(file string) (prospect.FileInfo, error) {
 	var i prospect.FileInfo
 
 	r, err := os.Open(file)

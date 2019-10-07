@@ -25,7 +25,7 @@ type FileInfo struct {
 }
 
 type Module interface {
-	Process(string) (FileInfo, error)
+	Process() (FileInfo, error)
 }
 
 type Plugin struct {

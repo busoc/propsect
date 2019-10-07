@@ -13,7 +13,7 @@ func New() prospect.Module {
 	return nil
 }
 
-func (m module) Process(file string) (prospect.FileInfo, error) {
+func (m module) Process() (prospect.FileInfo, error) {
 	var i prospect.FileInfo
 	return i, nil
 }
