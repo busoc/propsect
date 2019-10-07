@@ -2,9 +2,16 @@ package prospect
 
 import (
 	"encoding/xml"
+	"errors"
+	"fmt"
+	"plugin"
 	"sort"
 	"strings"
 	"time"
+)
+
+var (
+	ErrSkip = errors.New("skip module")
 )
 
 type FileInfo struct {
@@ -19,6 +26,31 @@ type FileInfo struct {
 
 type Module interface {
 	Process(string) (FileInfo, error)
+}
+
+type Plugin struct {
+	Module   string
+	Location string
+	Type     string
+}
+
+func (p Plugin) Open() (Module, error) {
+	if p.Module == "" {
+		return nil, ErrSkip
+	}
+	g, err := plugin.Open(p.Module)
+	if err != nil {
+		return nil, err
+	}
+	sym, err := g.Lookup("New")
+	if err != nil {
+		return nil, err
+	}
+	fn, ok := sym.(func() Module)
+	if !ok {
+		return nil, fmt.Errorf("%s: invalid plugin - invalid signture (%T)", p.Module, sym)
+	}
+	return fn(), nil
 }
 
 type Parameter struct {
@@ -95,8 +127,8 @@ func (m *Meta) MarshalXML(e *xml.Encoder, _ xml.StartElement) error {
 
 type Data struct {
 	Experiment string `toml:"-"`
+	File       string `toml:"-"`
 	Rootdir    string `toml:"rootdir"`
-	File       string `toml:"datadir"`
 	Level      int
 	Source     string
 	Integrity  string
@@ -106,6 +138,7 @@ type Data struct {
 	Crews      []string
 	Owner      string
 	Increments []string
+	Plugins    []Plugin `toml:"data"`
 
 	Path     string    `toml:"-"`
 	Sum      string    `toml:"-"`

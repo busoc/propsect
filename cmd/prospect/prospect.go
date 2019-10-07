@@ -18,8 +18,6 @@ import (
 )
 
 func main() {
-	count := flag.Int("n", 0, "files")
-	interval := flag.Bool("i", false, "interval")
 	flag.Parse()
 	r, err := os.Open(flag.Arg(0))
 	if err != nil {
@@ -37,24 +35,36 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := marshalMeta(d.Rootdir, d.Meta); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
-	}
-	var total int
+	fmt.Printf("%+v\n", d)
 	for i := range d.Dataset {
-		for ds := range walkDataset(d.Dataset[i]) {
-			if *interval && (ds.AcqTime.Before(d.Starts) || ds.AcqTime.After(d.Ends)) {
-				continue
-			}
-			ds.Experiment = d.Meta.Name
-			marshalData(d.Rootdir, ds)
-			total++
-			if *count > 0 && total >= *count {
-				break
-			}
+		if err := processData(d.Dataset[i]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
 		}
 	}
+	// if err := marshalMeta(d.Rootdir, d.Meta); err != nil {
+	// 	fmt.Fprintln(os.Stderr, err)
+	// 	os.Exit(2)
+	// }
+	// for i := range d.Dataset {
+	// 	for ds := range walkDataset(d.Dataset[i]) {
+	// 		ds.Experiment = d.Meta.Name
+	// 		marshalData(d.Rootdir, ds)
+	// 	}
+	// }
+}
+
+func processData(d prospect.Data) error {
+	for _, p := range d.Plugins {
+		_, err := p.Open()
+		switch err {
+		case prospect.ErrSkip:
+			continue
+		case nil:
+		default:
+			return err
+		}
+	}
+	return nil
 }
 
 func walkDataset(d prospect.Data) <-chan prospect.Data {
