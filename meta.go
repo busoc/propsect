@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"hash"
+	"path/filepath"
 	"plugin"
 	"sort"
 	"strings"
@@ -37,6 +38,7 @@ type FileInfo struct {
 
 type Module interface {
 	Process() (FileInfo, error)
+	fmt.Stringer
 }
 
 type Config struct {
@@ -195,7 +197,7 @@ func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
 	}
 	e.EncodeElement(d.Info.Type, startElement("productType"))
 	e.EncodeElement(d.Info.Mime, startElement("fileFormat"))
-	e.EncodeElement(d.Info.File, startElement("relativePath"))
+	e.EncodeElement(filepath.Join(d.Rootdir, d.Info.File), startElement("relativePath"))
 	xs := struct {
 		Method string `xml:"method"`
 		Value  string `xml:"value"`

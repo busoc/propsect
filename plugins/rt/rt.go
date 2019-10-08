@@ -40,12 +40,23 @@ func New(cfg prospect.Config) prospect.Module {
 	return m
 }
 
+func (m module) String() string {
+	return "rt"
+}
+
 func (m module) Process() (prospect.FileInfo, error) {
 	file := m.source.Glob()
 	if file == "" {
 		return prospect.FileInfo{}, prospect.ErrDone
 	}
-	return m.process(file)
+	i, err := m.process(file)
+	if err == nil {
+		i.Type = m.cfg.Type
+		i.Integrity = m.cfg.Integrity
+	} else {
+		err = fmt.Errorf("%s: %s", file, err)
+	}
+	return i, err
 }
 
 func (m module) process(file string) (prospect.FileInfo, error) {
@@ -62,7 +73,7 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 
 	ps, err := m.readFile(io.TeeReader(rt.NewReader(r), m.digest))
 	if err == nil {
-		i.Integrity = m.cfg.Integrity
+		i.File = file
 		i.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
 		i.AcqTime = timeFromFile(file)
 		i.Parameters = ps
@@ -78,19 +89,16 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 func (m module) readFile(rs io.Reader) ([]prospect.Parameter, error) {
 	var size int64
 	for i := 0; ; i++ {
-		switch n, err := rs.Read(m.buf); err {
-		case nil:
-			size += int64(n)
-		case io.EOF, rt.ErrInvalid:
+		if n, err := rs.Read(m.buf); err != nil {
 			ps := []prospect.Parameter{
 				{Name: fileDuration, Value: "300s"},
 				{Name: fileRecord, Value: fmt.Sprintf("%d", i)},
 				{Name: fileSize, Value: fmt.Sprintf("%d", size)},
-				{Name: fileCorrupted, Value: fmt.Sprintf("%t", err == rt.ErrInvalid)},
+				{Name: fileCorrupted, Value: fmt.Sprintf("%t", err != io.EOF)},
 			}
 			return ps, nil
-		default:
-			return nil, err
+		} else {
+			size += int64(n)
 		}
 	}
 }

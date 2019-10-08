@@ -32,23 +32,26 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	fmt.Printf("%+v\n", d)
 	for i := range d.Dataset {
-		if err := processData(d.Dataset[i], d.Meta.Starts, d.Meta.Ends); err != nil {
+		d.Dataset[i].Experiment = d.Meta.Name
+		if err := processData(d.Dataset[i], d.Rootdir, d.Meta.Starts, d.Meta.Ends); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		}
 	}
-	// if err := marshalMeta(d.Rootdir, d.Meta); err != nil {
-	// 	fmt.Fprintln(os.Stderr, err)
-	// 	os.Exit(2)
-	// }
+	if err := marshalMeta(d.Rootdir, d.Meta); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 }
 
-func processData(d prospect.Data, starts, ends time.Time) error {
+func processData(d prospect.Data, rootdir string, starts, ends time.Time) error {
 	var group errgroup.Group
 	for _, p := range d.Plugins {
 		if p.Integrity == "" {
 			p.Integrity = d.Integrity
+		}
+		if p.Type == "" {
+			p.Type = d.Type
 		}
 		mod, err := p.Open()
 		switch err {
@@ -58,29 +61,32 @@ func processData(d prospect.Data, starts, ends time.Time) error {
 		default:
 			return err
 		}
-		group.Go(runModule(mod, d, starts, ends))
+		group.Go(runModule(mod, d, rootdir, starts, ends))
 	}
 	return group.Wait()
 }
 
-func runModule(mod prospect.Module, d prospect.Data, starts, ends time.Time) func() error {
+func runModule(mod prospect.Module, d prospect.Data, rootdir string, starts, ends time.Time) func() error {
 	return func() error {
 		for {
 			switch i, err := mod.Process(); err {
 			case nil:
-				if i.AcqTime.Before(starts) || i.AcqTime.After(ends) {
+				if i.AcqTime.Before(starts) || i.AcqTime.After(ends) || i.File == "" {
 					continue
 				}
-				// x := d
-				// x.Info = i
-				fmt.Printf("%+v\n", i)
-				// if err := marshalData("", x); err != nil {
-				// 	return err
-				// }
+				i.Mime = d.GuessType(filepath.Ext(i.File))
+
+				x := d
+				x.Info = i
+
+				file := filepath.Join(rootdir, d.Rootdir, i.File)
+				if err := marshalData(file, x); err != nil {
+					return fmt.Errorf("metadata: %s", err)
+				}
 			case prospect.ErrDone:
 				return nil
 			default:
-				return err
+				return fmt.Errorf("%s: %s", mod, err)
 			}
 		}
 	}
