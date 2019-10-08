@@ -1,9 +1,14 @@
 package prospect
 
 import (
+	"crypto/md5"
+	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"hash"
 	"plugin"
 	"sort"
 	"strings"
@@ -12,6 +17,7 @@ import (
 
 var (
 	ErrSkip = errors.New("skip module")
+	ErrDone = errors.New("done")
 )
 
 type FileInfo struct {
@@ -38,6 +44,21 @@ type Config struct {
 	Module    string
 	Location  string
 	Type      string
+}
+
+func (c Config) Hash() hash.Hash {
+	var h hash.Hash
+	switch strings.ToLower(c.Integrity) {
+	case "sha256", "sha-256":
+		h = sha256.New()
+	case "sha512", "sha-512":
+		h = sha512.New512_256()
+	case "md5":
+		h = md5.New()
+	default:
+		h = sha1.New()
+	}
+	return h
 }
 
 func (c Config) Open() (Module, error) {

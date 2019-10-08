@@ -1,9 +1,6 @@
 package main
 
 import (
-	"crypto/md5"
-	"crypto/sha256"
-	"crypto/sha512"
 	"fmt"
 	"hash"
 	"io"
@@ -15,6 +12,7 @@ import (
 
 	"github.com/busoc/prospect"
 	"github.com/busoc/rt"
+	"github.com/midbel/glob"
 )
 
 const (
@@ -29,27 +27,25 @@ type module struct {
 
 	buf    []byte
 	digest hash.Hash
+	source *glob.Globber
 }
 
 func New(cfg prospect.Config) prospect.Module {
 	m := module{
-		cfg: cfg,
-		buf: make([]byte, 8<<20),
-	}
-	switch strings.ToLower(cfg.Integrity) {
-	case "sha256", "sha-256":
-		m.digest = sha256.New()
-	case "sha512", "sha-512":
-		m.digest = sha512.New512_256()
-	case "md5":
-		m.digest = md5.New()
-	default:
+		cfg:    cfg,
+		buf:    make([]byte, 8<<20),
+		digest: cfg.Hash(),
+		source: glob.New("", cfg.Location),
 	}
 	return m
 }
 
 func (m module) Process() (prospect.FileInfo, error) {
-	return m.process("")
+	file := m.source.Glob()
+	if file == "" {
+		return prospect.FileInfo{}, prospect.ErrDone
+	}
+	return m.process(file)
 }
 
 func (m module) process(file string) (prospect.FileInfo, error) {
@@ -66,6 +62,7 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 
 	ps, err := m.readFile(io.TeeReader(rt.NewReader(r), m.digest))
 	if err == nil {
+		i.Integrity = m.cfg.Integrity
 		i.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
 		i.AcqTime = timeFromFile(file)
 		i.Parameters = ps
@@ -89,7 +86,7 @@ func (m module) readFile(rs io.Reader) ([]prospect.Parameter, error) {
 				{Name: fileDuration, Value: "300s"},
 				{Name: fileRecord, Value: fmt.Sprintf("%d", i)},
 				{Name: fileSize, Value: fmt.Sprintf("%d", size)},
-				{Name: fileCorrupted, Value: fmt.Sprintf("%d", err == rt.ErrInvalid)},
+				{Name: fileCorrupted, Value: fmt.Sprintf("%t", err == rt.ErrInvalid)},
 			}
 			return ps, nil
 		default:

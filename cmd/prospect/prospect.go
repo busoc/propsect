@@ -7,9 +7,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/busoc/prospect"
 	"github.com/midbel/toml"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -32,28 +34,23 @@ func main() {
 	}
 	fmt.Printf("%+v\n", d)
 	for i := range d.Dataset {
-		if err := processData(d.Dataset[i]); err != nil {
+		if err := processData(d.Dataset[i], d.Meta.Starts, d.Meta.Ends); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		}
 	}
-	if err := marshalMeta(d.Rootdir, d.Meta); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
-	}
-	// for i := range d.Dataset {
-	// 	for ds := range walkDataset(d.Dataset[i]) {
-	// 		ds.Experiment = d.Meta.Name
-	// 		marshalData(d.Rootdir, ds)
-	// 	}
+	// if err := marshalMeta(d.Rootdir, d.Meta); err != nil {
+	// 	fmt.Fprintln(os.Stderr, err)
+	// 	os.Exit(2)
 	// }
 }
 
-func processData(d prospect.Data) error {
+func processData(d prospect.Data, starts, ends time.Time) error {
+	var group errgroup.Group
 	for _, p := range d.Plugins {
 		if p.Integrity == "" {
 			p.Integrity = d.Integrity
 		}
-		_, err := p.Open()
+		mod, err := p.Open()
 		switch err {
 		case prospect.ErrSkip:
 			continue
@@ -61,8 +58,32 @@ func processData(d prospect.Data) error {
 		default:
 			return err
 		}
+		group.Go(runModule(mod, d, starts, ends))
 	}
-	return nil
+	return group.Wait()
+}
+
+func runModule(mod prospect.Module, d prospect.Data, starts, ends time.Time) func() error {
+	return func() error {
+		for {
+			switch i, err := mod.Process(); err {
+			case nil:
+				if i.AcqTime.Before(starts) || i.AcqTime.After(ends) {
+					continue
+				}
+				// x := d
+				// x.Info = i
+				fmt.Printf("%+v\n", i)
+				// if err := marshalData("", x); err != nil {
+				// 	return err
+				// }
+			case prospect.ErrDone:
+				return nil
+			default:
+				return err
+			}
+		}
+	}
 }
 
 func marshalData(dir string, d prospect.Data) error {
