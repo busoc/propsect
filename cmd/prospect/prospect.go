@@ -68,6 +68,7 @@ func processData(d prospect.Data, rootdir string, starts, ends time.Time) error 
 
 func runModule(mod prospect.Module, d prospect.Data, rootdir string, starts, ends time.Time) func() error {
 	return func() error {
+		fmt.Println("start running module", mod.String())
 		for {
 			switch i, err := mod.Process(); err {
 			case nil:
