@@ -77,35 +77,43 @@ func (b *Builder) Build() error {
 		if err != nil {
 			return err
 		}
-		for {
-			switch i, err := mod.Process(); err {
-			case nil:
-				src, keep := b.keepFile(i)
-				if !keep {
-					continue
-				}
-				i.Mime = b.guessType(filepath.Ext(i.File))
-
-				x := b.data
-				x.Experiment = b.meta.Name
-				x.Source = src
-				x.Info = i
-
-				if err := b.marshalData(x); err != nil {
-					return err
-				}
-				if err := b.copyFile(x); err != nil {
-					return err
-				}
-			case ErrSkip:
-			case ErrDone:
-				return nil
-			default:
-				return fmt.Errorf("%s: %s", mod, err)
-			}
-		}
+    if err := b.executeModule(mod); err != nil {
+      return err
+    }
 	}
 	return b.marshalMeta()
+}
+
+func (b *Builder) executeModule(mod Module) error {
+  for {
+    now := time.Now()
+    switch i, err := mod.Process(); err {
+    case nil:
+      src, keep := b.keepFile(i)
+      if !keep {
+        continue
+      }
+      i.Mime = b.guessType(filepath.Ext(i.File))
+
+      x := b.data
+      x.Experiment = b.meta.Name
+      x.Source = src
+      x.Info = i
+
+      if err := b.marshalData(x); err != nil {
+        return err
+      }
+      if err := b.copyFile(x); err != nil {
+        return err
+      }
+      fmt.Printf("[%s - %s] %s\n", mod, time.Since(now), i.File)
+    case ErrSkip:
+    case ErrDone:
+      return nil
+    default:
+      return fmt.Errorf("%s: %s", mod, err)
+    }
+  }
 }
 
 func (b *Builder) marshalMeta() error {
