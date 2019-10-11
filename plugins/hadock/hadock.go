@@ -106,10 +106,12 @@ func (m module) Process() (prospect.FileInfo, error) {
 		break
 	}
 	i, err := m.process(file)
-	if err == nil {
+	switch err {
+	case nil:
 		i.Type = m.cfg.Type
 		i.Integrity = m.cfg.Integrity
-	} else {
+	case prospect.ErrSkip:
+	default:
 		err = fmt.Errorf("%s: %s", file, err)
 	}
 	return i, err
@@ -126,6 +128,9 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 		r.Close()
 		m.digest.Reset()
 	}()
+	if s, _ := r.Stat(); err == nil && s.IsDir() {
+		return i, prospect.ErrSkip
+	}
 	if ps, err := readFile(io.TeeReader(r, m.digest)); err == nil {
 		i.File = file
 		i.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
@@ -136,7 +141,7 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 			i.Parameters = append(i.Parameters, ps...)
 		}
 		if s, err := r.Stat(); err == nil {
-			i.ModTime = s.ModTime()
+			i.ModTime = s.ModTime().UTC()
 		}
 	}
 	return i, nil

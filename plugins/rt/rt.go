@@ -80,7 +80,7 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 
 		s, err := r.Stat()
 		if err == nil {
-			i.ModTime = s.ModTime()
+			i.ModTime = s.ModTime().UTC()
 		}
 	}
 	return i, err

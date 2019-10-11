@@ -1,86 +1,21 @@
 package prospect
 
 import (
-	"crypto/md5"
-	"crypto/sha1"
-	"crypto/sha256"
-	"crypto/sha512"
 	"encoding/xml"
 	"errors"
-	"fmt"
-	"hash"
+	"io"
 	"path/filepath"
-	"plugin"
 	"sort"
 	"strings"
 	"time"
 )
 
+const DefaultMime = "application/octet-stream"
+
 var (
 	ErrSkip = errors.New("skip module")
 	ErrDone = errors.New("done")
 )
-
-type FileInfo struct {
-	File string
-	Type string
-	Mime string
-
-	Integrity string
-	Sum       string
-	Size      int
-
-	ModTime time.Time
-	AcqTime time.Time
-
-	Parameters []Parameter
-}
-
-type Module interface {
-	Process() (FileInfo, error)
-	fmt.Stringer
-}
-
-type Config struct {
-	Integrity string
-	Module    string
-	Location  string
-	Type      string
-}
-
-func (c Config) Hash() hash.Hash {
-	var h hash.Hash
-	switch strings.ToLower(c.Integrity) {
-	case "sha256", "sha-256":
-		h = sha256.New()
-	case "sha512", "sha-512":
-		h = sha512.New512_256()
-	case "md5":
-		h = md5.New()
-	default:
-		h = sha1.New()
-	}
-	return h
-}
-
-func (c Config) Open() (Module, error) {
-	if c.Module == "" {
-		return nil, ErrSkip
-	}
-	g, err := plugin.Open(c.Module)
-	if err != nil {
-		return nil, err
-	}
-	sym, err := g.Lookup("New")
-	if err != nil {
-		return nil, err
-	}
-	fn, ok := sym.(func(Config) Module)
-	if !ok {
-		return nil, fmt.Errorf("%s: invalid plugin - invalid signture (%T)", c.Module, sym)
-	}
-	return fn(c), nil
-}
 
 type Parameter struct {
 	Name  string
@@ -154,20 +89,24 @@ func (m *Meta) MarshalXML(e *xml.Encoder, _ xml.StartElement) error {
 	return nil
 }
 
+type Activity struct {
+	Type   string
+	Name   string
+	Starts time.Time `toml:"dtstart"`
+	Ends   time.Time `toml:"dtend"`
+}
+
 type Data struct {
-	Experiment string `toml:"-"`
-	File       string `toml:"-"`
-	Rootdir    string `toml:"rootdir"`
+	Experiment string
+	Rootdir    string
 	Level      int
 	Source     string
 	Integrity  string
 	Type       string
 	Model      string
-	Mimes      []Mime `toml:"mimetype"`
 	Crews      []string
 	Owner      string
 	Increments []string
-	Plugins    []Config `toml:"data"`
 
 	Info FileInfo
 }
@@ -216,19 +155,44 @@ func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
 	return nil
 }
 
-func (d Data) GuessType(ext string) string {
-	mime := "application/octet-stream"
-	for _, m := range d.Mimes {
-		t, ok := m.Has(ext)
-		if ok {
-			mime = t
-			break
-		}
-	}
-	return mime
-}
-
 func startElement(label string) xml.StartElement {
 	n := xml.Name{Local: label}
 	return xml.StartElement{Name: n}
+}
+
+func encodeMeta(w io.Writer, m Meta) error {
+	doc := struct {
+		XMLName  xml.Name `xml:"http://eusoc.upm.es/SDC/Experiments/1 experiment"`
+		Instance string   `xml:"xmlns:xsi,attr"`
+		Location string   `xml:"xsi:schemaLocation,attr"`
+		Meta     *Meta
+	}{
+		Meta:     &m,
+		Instance: "http://www.w3.org/2001/XMLSchema-instance",
+		Location: "experiment_metadata_schema.xsd",
+	}
+	return encodeDocument(w, doc)
+}
+
+func encodeData(w io.Writer, d Data) error {
+	doc := struct {
+		XMLName  xml.Name `xml:"http://eusoc.upm.es/SDC/Metadata/1 metadata"`
+		Instance string   `xml:"xmlns:xsi,attr"`
+		Location string   `xml:"xsi:schemaLocation,attr"`
+		Data     *Data
+	}{
+		Data:     &d,
+		Instance: "http://www.w3.org/2001/XMLSchema-instance",
+		Location: "file_metadata_schema.xsd",
+	}
+	return encodeDocument(w, doc)
+}
+
+func encodeDocument(w io.Writer, doc interface{}) error {
+	if _, err := io.WriteString(w, xml.Header); err != nil {
+		return err
+	}
+	e := xml.NewEncoder(w)
+	e.Indent("", "\t")
+	return e.Encode(doc)
 }
