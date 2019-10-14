@@ -78,9 +78,12 @@ func (c Config) Open() (Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn, ok := sym.(func(Config) Module)
-	if !ok {
+	switch fn := sym.(type) {
+	case func(Config) Module:
+		return fn(c), nil
+	case func(Config) (Module, error):
+		return fn(c)
+	default:
 		return nil, fmt.Errorf("%s: invalid plugin - invalid signture (%T)", c.Module, sym)
 	}
-	return fn(c), nil
 }
