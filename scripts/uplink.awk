@@ -85,7 +85,7 @@ BEGIN {
   }
 }
 /File Size/ {
-  gsub(/bytes|,/, "", $2)
+  gsub(/ *bytes|,/, "", $2)
   data[file]["size"] = trimBlank($2);
 }
 /Filename/ {
