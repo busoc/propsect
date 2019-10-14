@@ -8,6 +8,7 @@ function trimBlank(value) {
 
 BEGIN {
   FS=":"
+  OFS = ","
   # put the list of slot here (from hourglass database)
   slots[318826020] = "TMLOG4.DAT";
   slots[318826018] = "TMLOG2.DAT";
@@ -122,11 +123,12 @@ END {
     ori = data[i]["origin"]
     cmd = data[i]["command"]
     slot = data[i]["slot"]
-    # file = data[i]["filename"]
+    file = data[i]["filename"]
     size = data[i]["size"]
     cksum = data[i]["checksum"]
     uplink = data[i]["uplink"]
     transfer = data[i]["transfer"]
-    printf("%32s | %32s | %36s | %12s | %12s | %8s | %s\n", ori, cmd, slot, uplink, transfer, size, cksum)
+    print FILENAME, file, ori, cmd, slot, uplink, transfer, size, cksum
+    # printf("%32s | %32s | %36s | %12s | %12s | %8s | %s\n", ori, cmd, slot, uplink, transfer, size, cksum)
   }
 }
