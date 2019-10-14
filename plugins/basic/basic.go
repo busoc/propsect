@@ -35,7 +35,6 @@ func (m module) String() string {
 
 func (m module) Process() (prospect.FileInfo, error) {
 	file := m.source.Glob()
-	fmt.Println(file)
 	if file == "" {
 		return prospect.FileInfo{}, prospect.ErrDone
 	}
