@@ -38,6 +38,7 @@ type Config struct {
 	Module    string
 	Location  string
 	Type      string
+	Mime      string
 }
 
 func (c Config) Hash() hash.Hash {
