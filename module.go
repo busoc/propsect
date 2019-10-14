@@ -39,6 +39,16 @@ type Config struct {
 	Location  string
 	Type      string
 	Mime      string
+	Mimes     []Mime `toml:"mimetype"`
+}
+
+func (c Config) guessType(ext string) string {
+	for _, m := range c.Mimes {
+		if mime, ok := m.Has(ext); ok {
+			return mime
+		}
+	}
+	return c.Mime
 }
 
 func (c Config) Hash() hash.Hash {

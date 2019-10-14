@@ -98,10 +98,11 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 			if !keep {
 				continue
 			}
-			if cfg.Mime == "" {
-				i.Mime = b.guessType(filepath.Ext(i.File))
+			ext := filepath.Ext(i.File)
+			if m := cfg.guessType(ext); m == "" {
+				i.Mime = b.guessType(ext)
 			} else {
-				i.Mime = cfg.Mime
+				i.Mime = m
 			}
 
 			x := b.data
