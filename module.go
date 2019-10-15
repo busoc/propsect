@@ -7,7 +7,6 @@ import (
 	"crypto/sha512"
 	"fmt"
 	"hash"
-	// "path/filepath"
 	"plugin"
 	"strings"
 	"time"

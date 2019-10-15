@@ -97,7 +97,7 @@ type Activity struct {
 }
 
 type Data struct {
-	Experiment string
+	Experiment string `toml:"-"`
 	Rootdir    string
 	Level      int
 	Source     string
