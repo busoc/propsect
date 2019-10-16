@@ -85,7 +85,7 @@ BEGIN {
     transferTime = "-"
   }
 }
-/File Size/ {
+/File [sS]ize/ {
   gsub(/ *bytes|,/, "", $2)
   data[file]["size"] = trimBlank($2);
 }
