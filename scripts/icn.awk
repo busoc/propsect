@@ -38,6 +38,7 @@ function dump(i) {
   cmd = data[i]["command"]
   gsub(/File_/, "", cmd)
 
+  sid = data[i]["sid"]
   slot = data[i]["slot"]
   gsub(/_DAT$/, ".DAT", slot)
 
@@ -51,8 +52,11 @@ function dump(i) {
 
   flag = data[i]["flag"] == "" ? "-" : "*"
 
-  # print FILENAME, file, ori, cmd, slot, uplink, transfer, size, cksum
-  printf("%32s | %32s | %36s | %14s | %14s | %s | %8s | %s\n", ori, cmd, slot, uplink, transfer, flag, size, cksum)
+  if (format == "csv" || format == "") {
+    print FILENAME, file, ori, cmd, slot, sid, uplink, transfer, flag, size, cksum
+  } else {
+    printf("%32s | %32s | %36s | %s | %14s | %14s | %s | %8s | %s\n", ori, cmd, slot, sid, uplink, transfer, flag, size, cksum)
+  }
 }
 
 BEGIN {
