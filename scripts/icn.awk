@@ -1,9 +1,8 @@
 #!/usr/bin/awk -f
 
-function trimBlank(value) {
-  v = value
-  gsub(/^( |\n)/, "", v);
-  return v
+function trimSpace(value) {
+  gsub(/^\s|\s$/, "", value);
+  return value
 }
 
 function parseFilename(str) {
@@ -31,6 +30,7 @@ function parseFilename(str) {
 function dump(i) {
   ori = data[i]["origin"]
   gsub(/File_/, "", ori)
+
   if (ori == "") {
     return
   }
@@ -66,17 +66,16 @@ BEGIN {
   uplinkTime = substr(line, RSTART, RLENGTH)
 
   line = substr(line, RSTART+RLENGTH)
-  
+
   match(line, /[0-9]{2}:[0-9]{2}/)
   transferTime = substr(line, RSTART, RLENGTH)
 }
 /File [Ss]ize/ {
-  gsub(/ *bytes|,/, "", $2)
-  data[file]["size"] = trimBlank($2);
+  gsub(/\s*(bytes|,)\s*/, "", $2)
+  data[file]["size"] = trimSpace($2);
 }
 /Filename/ {
-  gsub(/\.dat|\.DAT/, "", $2)
-  file = trimBlank($2)
+  file = trimSpace($2)
 
   data[file]["uplink"] = uplinkTime
   data[file]["transfer"] = transferTime
@@ -97,7 +96,7 @@ BEGIN {
   }
 }
 /Checksum/ {
-  data[file]["checksum"] = trimBlank($2);
+  data[file]["checksum"] = trimSpace($2);
 }
 /\[b\]/  {
   warning = "*"
