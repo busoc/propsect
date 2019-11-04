@@ -16,12 +16,12 @@ import (
 const (
 	fileSize      = "file.size"
 	fileMD5       = "file.md5"
-	fileOriginal  = "file.filename.original"
-	fileUplink    = "file.filename.uplink"
-	fileMMU       = "file.filename.mmu"
-	fileUpTime    = "file.time.uplink"
-	fileFerTime   = "file.time.transfer"
-	fileSource    = "file.source"
+	fileOriginal  = "uplink.file.local"
+	fileUplink    = "uplink.file.uplink"
+	fileMMU       = "uplink.file.mmu"
+	fileUpTime    = "uplink.time.uplink"
+	fileFerTime   = "uplink.time.transfer"
+	fileSource    = "uplink.source"
 	fileRecords   = "file.numrec"
 	fileReference = "file.reference"
 )
