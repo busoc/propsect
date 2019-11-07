@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/busoc/prospect"
 )
@@ -50,13 +51,13 @@ func New(cfg prospect.Config) (prospect.Module, error) {
 		sources: make(map[string]struct{}),
 	}
 	m.reader.ReuseRecord = true
-	m.reader.FieldsPerRecord = 9
+	m.reader.FieldsPerRecord = 11
 
 	return m, nil
 }
 
 func (m *module) String() string {
-	return "filup"
+	return "icn"
 }
 
 func (m *module) Process() (prospect.FileInfo, error) {
@@ -122,17 +123,19 @@ func (m *module) processRecord(row []string) (prospect.FileInfo, error) {
 		newParameter(fileOriginal, row[2]),
 		newParameter(fileUplink, row[1]),
 		newParameter(fileMMU, row[3]),
-		newParameter(fileMD5, row[8]),
+		newParameter(fileMD5, row[10]),
 		newParameter(fileSize, fmt.Sprintf("%d", s.Size())),
 	}
-	if row[5] != "" || row[5] != "-" {
-		i.Parameters = append(i.Parameters, newParameter(fileUpTime, row[5]))
-	}
 	if row[6] != "" || row[6] != "-" {
-		i.Parameters = append(i.Parameters, newParameter(fileFerTime, row[6]))
+		i.AcqTime, _ = time.Parse("2006/002 15:04", row[6])
+		i.AcqTime = i.AcqTime.UTC()
+		i.Parameters = append(i.Parameters, newParameter(fileUpTime, row[6]))
+	}
+	if row[7] != "" || row[7] != "-" {
+		i.Parameters = append(i.Parameters, newParameter(fileFerTime, row[7]))
 	}
 
-	i.AcqTime = s.ModTime().UTC()
+	// i.AcqTime = s.ModTime().UTC()
 	i.ModTime = s.ModTime().UTC()
 	i.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
 	i.File = r.Name()
