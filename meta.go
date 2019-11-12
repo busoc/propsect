@@ -29,28 +29,6 @@ type Payload struct {
 	Class   int      `xml:"payloadClass"`
 }
 
-type Mime struct {
-	Extensions []string
-	Mime       string `toml:"mime"`
-	Type       string
-}
-
-func (m *Mime) Has(ext string) (string, string, bool) {
-	if !sort.StringsAreSorted(m.Extensions) {
-		sort.Strings(m.Extensions)
-	}
-	var (
-		x    = sort.SearchStrings(m.Extensions, ext)
-		ok   = x < len(m.Extensions) && m.Extensions[x] == ext
-		mime string
-		data string
-	)
-	if ok {
-		mime, data = m.Mime, m.Type
-	}
-	return mime, data, ok
-}
-
 type Meta struct {
 	Id   int    `xml:"-"`
 	Accr string `toml:"acronym" xml:",comment"`
