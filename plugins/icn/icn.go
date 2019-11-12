@@ -82,22 +82,41 @@ func (m *module) Process() (prospect.FileInfo, error) {
 		if _, ok := m.sources[row[0]]; !ok {
 			m.sources[row[0]] = struct{}{}
 			m.next = row
-			i, err := m.processListing(row[0])
-			if err == nil {
-				i.Type = m.cfg.Type
-				i.Integrity = m.cfg.Integrity
-			}
-			return i, err
+
+			return m.startList(row)
 		}
 	} else {
 		row = m.next
 	}
 	m.next = nil
+	return m.startRecord(row)
+}
 
+func (m *module) startList(row []string) (prospect.FileInfo, error) {
+	i, err := m.processListing(row[0])
+	if err == nil {
+		i.Mime, i.Type = m.cfg.GuessType(filepath.Ext(row[0]))
+		if i.Mime == "" {
+			i.Mime = prospect.MimeICN
+		}
+		if i.Type == "" {
+			i.Type = prospect.TypeUplinkNote
+		}
+	}
+	return i, err
+}
+
+func (m *module) startRecord(row []string) (prospect.FileInfo, error) {
 	i, err := m.processRecord(row)
 	switch err {
 	case nil:
-		i.Type = m.cfg.Type
+		i.Mime, i.Type = m.cfg.GuessType(filepath.Ext(row[1]))
+		if i.Mime == "" {
+			i.Mime = prospect.MimePlainDefault
+		}
+		if i.Type == "" {
+			i.Type = prospect.TypeUplinkFile
+		}
 		i.Integrity = m.cfg.Integrity
 	case prospect.ErrSkip:
 	default:

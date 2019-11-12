@@ -108,7 +108,13 @@ func (m module) Process() (prospect.FileInfo, error) {
 	i, err := m.process(file)
 	switch err {
 	case nil:
-		i.Type = m.cfg.Type
+		i.Mime, i.Type = m.cfg.GuessType(filepath.Ext(file))
+		if i.Mime == "" {
+			i.Mime = prospect.MimeOctetDefault
+		}
+		if i.Type == "" {
+			i.Type = prospect.TypeHighRateData
+		}
 		i.Integrity = m.cfg.Integrity
 	case prospect.ErrSkip:
 	default:

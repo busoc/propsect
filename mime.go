@@ -12,6 +12,14 @@ const (
 	MimeICN          = "text/plain;access=sequential;form=block-formatted;type=icn"
 )
 
+const (
+	TypeData         = "data"
+	TypeUplinkFile   = "uplink file"
+	TypeUplinkNote   = "intre-console note"
+	TypeHighRateData = "high rate data"
+	TypeRawTelemetry = "medium rate telemetry"
+)
+
 type Mime struct {
 	Extensions []string
 	Mime       string `toml:"mime"`

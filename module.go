@@ -41,7 +41,7 @@ type Config struct {
 	Mimes     []Mime `toml:"mimetype"`
 }
 
-func (c Config) guessType(ext string) (string, string) {
+func (c Config) GuessType(ext string) (string, string) {
 	for _, m := range c.Mimes {
 		if mi, ty, ok := m.Has(ext); ok {
 			if ty == "" {

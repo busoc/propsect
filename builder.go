@@ -15,9 +15,8 @@ import (
 )
 
 type Builder struct {
-	meta    Meta
-	data    Data
-	mimes   []Mime
+	meta Meta
+	data Data
 	modules []Config
 	sources []Activity
 
@@ -39,8 +38,7 @@ func NewBuilder(file string) (*Builder, error) {
 		Levels  []string `toml:"directories"`
 
 		Meta
-		Data    `toml:"dataset"`
-		Mimes   []Mime     `toml:"mimetype"`
+		Data `toml:"dataset"`
 		Plugins []Config   `toml:"module"`
 		Periods []Activity `toml:"period"`
 	}{}
@@ -56,10 +54,9 @@ func NewBuilder(file string) (*Builder, error) {
 	}
 
 	b := Builder{
-		dryrun:    c.Dry,
-		meta:      c.Meta,
-		data:      c.Data,
-		mimes:     c.Mimes,
+		dryrun: c.Dry,
+		meta:   c.Meta,
+		data:   c.Data,
 		modules:   c.Plugins,
 		sources:   c.Periods,
 		marshaler: m,
@@ -101,15 +98,6 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 			if !keep {
 				continue
 			}
-			ext := filepath.Ext(i.File)
-			if m, t := cfg.guessType(ext); m == "" {
-				i.Mime, i.Type = b.guessType(ext)
-			} else {
-				i.Mime, i.Type = m, t
-			}
-			if i.Type == "" {
-				i.Type = b.data.Type
-			}
 
 			x := b.data
 			x.Experiment = b.meta.Name
@@ -150,21 +138,6 @@ func (b *Builder) keepFile(i FileInfo) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-func (b *Builder) guessType(ext string) (string, string) {
-	var (
-		mime = DefaultMime
-		data string
-	)
-	for _, m := range b.mimes {
-		mi, ty, ok := m.Has(ext)
-		if ok {
-			mime, data = mi, ty
-			break
-		}
-	}
-	return mime, data
 }
 
 type marshaler interface {

@@ -5,6 +5,7 @@ import (
 	"hash"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/busoc/prospect"
 	"github.com/midbel/glob"
@@ -40,7 +41,13 @@ func (m module) Process() (prospect.FileInfo, error) {
 	}
 	i, err := m.process(file)
 	if err == nil {
-		i.Type = m.cfg.Type
+		i.Mime, i.Type = m.cfg.GuessType(filepath.Ext(file))
+		if i.Mime == "" {
+			i.Mime = prospect.MimeOctetDefault
+		}
+		if i.Type == "" {
+			i.Type = prospect.TypeData
+		}
 		i.Integrity = m.cfg.Integrity
 	}
 	return i, err

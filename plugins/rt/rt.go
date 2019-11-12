@@ -51,7 +51,13 @@ func (m module) Process() (prospect.FileInfo, error) {
 	}
 	i, err := m.process(file)
 	if err == nil {
-		i.Type = m.cfg.Type
+		i.Mime, i.Type = m.cfg.GuessType(filepath.Ext(file))
+		if i.Mime == "" {
+			i.Mime = prospect.MimeOctetUnformat
+		}
+		if i.Type == "" {
+			i.Mime = prospect.TypeRawTelemetry
+		}
 		i.Integrity = m.cfg.Integrity
 	} else {
 		err = fmt.Errorf("%s: %s", file, err)
