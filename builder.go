@@ -102,10 +102,13 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 				continue
 			}
 			ext := filepath.Ext(i.File)
-			if m := cfg.guessType(ext); m == "" {
-				i.Mime = b.guessType(ext)
+			if m, t := cfg.guessType(ext); m == "" {
+				i.Mime, i.Type = b.guessType(ext)
 			} else {
-				i.Mime = m
+				i.Mime, i.Type = m, t
+			}
+			if i.Type == "" {
+				i.Type = b.data.Type
 			}
 
 			x := b.data
@@ -149,16 +152,19 @@ func (b *Builder) keepFile(i FileInfo) (string, bool) {
 	return "", false
 }
 
-func (b *Builder) guessType(ext string) string {
-	mime := DefaultMime
+func (b *Builder) guessType(ext string) (string, string) {
+	var (
+		mime = DefaultMime
+		data string
+	)
 	for _, m := range b.mimes {
-		t, ok := m.Has(ext)
+		mi, ty, ok := m.Has(ext)
 		if ok {
-			mime = t
+			mime, data = mi, ty
 			break
 		}
 	}
-	return mime
+	return mime, data
 }
 
 type marshaler interface {
@@ -229,6 +235,14 @@ func (b *filebuilder) marshalData(d Data) error {
 		return err
 	}
 	defer w.Close()
+
+	if d.Info.File != file {
+		dir := b.rootdir
+		if !strings.HasSuffix(dir, "/") {
+			dir += "/"
+		}
+		d.Info.File = strings.TrimPrefix(file, dir)
+	}
 
 	return encodeData(w, d)
 }
@@ -301,6 +315,11 @@ func (b *zipbuilder) marshalData(d Data) error {
 	if err != nil {
 		return err
 	}
+
+	if d.Info.File != file {
+		d.Info.File = file
+	}
+
 	return encodeData(w, d)
 }
 

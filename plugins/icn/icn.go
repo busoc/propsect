@@ -15,16 +15,19 @@ import (
 )
 
 const (
-	fileSize      = "file.size"
-	fileMD5       = "file.md5"
-	fileOriginal  = "uplink.file.local"
-	fileUplink    = "uplink.file.uplink"
-	fileMMU       = "uplink.file.mmu"
-	fileUpTime    = "uplink.time.uplink"
-	fileFerTime   = "uplink.time.transfer"
-	fileSource    = "uplink.source"
-	fileRecords   = "file.numrec"
-	fileReference = "file.reference"
+	fileSize     = "file.size"
+	fileMD5      = "file.md5"
+	fileOriginal = "uplink.file.local"
+	fileUplink   = "uplink.file.uplink"
+	fileMMU      = "uplink.file.mmu"
+	fileUpTime   = "uplink.time.uplink"
+	fileFerTime  = "uplink.time.transfer"
+	fileSource   = "uplink.source"
+	fileRecords  = "file.numrec"
+	ptrRef       = "ptr.%d.href"
+	ptrRole      = "ptr.%d.role"
+
+	defaultRole = "uplinked file"
 )
 
 type module struct {
@@ -79,7 +82,12 @@ func (m *module) Process() (prospect.FileInfo, error) {
 		if _, ok := m.sources[row[0]]; !ok {
 			m.sources[row[0]] = struct{}{}
 			m.next = row
-			return m.processListing(row[0])
+			i, err := m.processListing(row[0])
+			if err == nil {
+				i.Type = m.cfg.Type
+				i.Integrity = m.cfg.Integrity
+			}
+			return i, err
 		}
 	} else {
 		row = m.next
@@ -180,10 +188,13 @@ func (m *module) processListing(file string) (prospect.FileInfo, error) {
 		newParameter(fileSize, fmt.Sprintf("%d", size)),
 		newParameter(fileRecords, fmt.Sprintf("%d", len(refs))),
 	}
-	dir := filepath.Dir(file)
+	// dir := filepath.Dir(file)
 	for j, r := range refs {
-		ref := fmt.Sprintf("%s.%d", fileReference, j+1)
-		i.Parameters = append(i.Parameters, newParameter(ref, filepath.Join(dir, r)))
+		ref := fmt.Sprintf(ptrRef, j+1)
+		// i.Parameters = append(i.Parameters, newParameter(ref, filepath.Join(dir, r)))
+		i.Parameters = append(i.Parameters, newParameter(ref, r))
+		rol := fmt.Sprintf(ptrRole, j+1)
+		i.Parameters = append(i.Parameters, newParameter(rol, defaultRole))
 	}
 
 	i.AcqTime = s.ModTime().UTC()

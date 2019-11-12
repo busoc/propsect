@@ -4,7 +4,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"io"
-	"path/filepath"
+	// "path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -31,10 +31,11 @@ type Payload struct {
 
 type Mime struct {
 	Extensions []string
-	Type       string `toml:"type"`
+	Mime       string `toml:"mime"`
+	Type       string
 }
 
-func (m *Mime) Has(ext string) (string, bool) {
+func (m *Mime) Has(ext string) (string, string, bool) {
 	if !sort.StringsAreSorted(m.Extensions) {
 		sort.Strings(m.Extensions)
 	}
@@ -42,11 +43,12 @@ func (m *Mime) Has(ext string) (string, bool) {
 		x    = sort.SearchStrings(m.Extensions, ext)
 		ok   = x < len(m.Extensions) && m.Extensions[x] == ext
 		mime string
+		data string
 	)
 	if ok {
-		mime = m.Type
+		mime, data = m.Mime, m.Type
 	}
-	return mime, ok
+	return mime, data, ok
 }
 
 type Meta struct {
@@ -90,7 +92,7 @@ func (m *Meta) MarshalXML(e *xml.Encoder, _ xml.StartElement) error {
 }
 
 type Activity struct {
-	Type   string
+	Type   string `toml:"source"`
 	Name   string
 	Starts time.Time `toml:"dtstart"`
 	Ends   time.Time `toml:"dtend"`
@@ -116,8 +118,8 @@ func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
 	e.EncodeElement(d.Model, startElement("model"))
 	e.EncodeElement(d.Source, startElement("dataSource"))
 	e.EncodeElement(d.Owner, startElement("dataOwner"))
-	e.EncodeElement(d.Info.AcqTime, startElement("acquisitionTime"))
-	e.EncodeElement(d.Info.ModTime, startElement("creationTime"))
+	e.EncodeElement(d.Info.AcqTime.Format(time.RFC3339), startElement("acquisitionTime"))
+	e.EncodeElement(d.Info.ModTime.Format(time.RFC3339), startElement("creationTime"))
 	is := struct {
 		Values []string `xml:"increment"`
 	}{
@@ -136,7 +138,7 @@ func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
 	}
 	e.EncodeElement(d.Info.Type, startElement("productType"))
 	e.EncodeElement(d.Info.Mime, startElement("fileFormat"))
-	e.EncodeElement(filepath.Join(d.Rootdir, d.Info.File), startElement("relativePath"))
+	e.EncodeElement(d.Info.File, startElement("relativePath"))
 	xs := struct {
 		Method string `xml:"method"`
 		Value  string `xml:"value"`
