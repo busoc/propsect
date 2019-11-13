@@ -18,15 +18,15 @@ import (
 
 const (
 	fileSize     = "file.size"
-	fileChannel  = "file.channel"
-	fileSource   = "file.source"
-	fileUPI      = "file.upi"
-	fileInstance = "file.instance"
-	fileMode     = "file.mode"
-	fileFCC      = "file.fcc"
-	fileWidth    = "file.pixels.x"
-	fileHeight   = "file.pixels.y"
-	fileBad      = "file.invalid"
+	fileChannel  = "hrd.channel"
+	fileSource   = "hrd.source"
+	fileUPI      = "hrd.upi"
+	fileInstance = "hrd.instance"
+	fileMode     = "hrd.mode"
+	fileFCC      = "hrd.fcc"
+	fileWidth    = "hrd.pixels.x"
+	fileHeight   = "hrd.pixels.y"
+	fileBad      = "hrd.invalid"
 )
 
 const (
