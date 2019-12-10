@@ -15,8 +15,8 @@ import (
 )
 
 type Builder struct {
-	meta Meta
-	data Data
+	meta    Meta
+	data    Data
 	modules []Config
 	sources []Activity
 
@@ -38,7 +38,7 @@ func NewBuilder(file string) (*Builder, error) {
 		Levels  []string `toml:"directories"`
 
 		Meta
-		Data `toml:"dataset"`
+		Data    `toml:"dataset"`
 		Plugins []Config   `toml:"module"`
 		Periods []Activity `toml:"period"`
 	}{}
@@ -54,9 +54,9 @@ func NewBuilder(file string) (*Builder, error) {
 	}
 
 	b := Builder{
-		dryrun: c.Dry,
-		meta:   c.Meta,
-		data:   c.Data,
+		dryrun:    c.Dry,
+		meta:      c.Meta,
+		data:      c.Data,
 		modules:   c.Plugins,
 		sources:   c.Periods,
 		marshaler: m,
@@ -104,11 +104,11 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 			x.Source = src
 			x.Info = i
 
-			if err := b.marshalData(x); err != nil {
+			if err := b.marshalData(x, cfg.Directories); err != nil {
 				return err
 			}
 			if !b.dryrun {
-				if err := b.copyFile(x); err != nil {
+				if err := b.copyFile(x, cfg.Directories); err != nil {
 					return err
 				}
 			}
@@ -141,9 +141,9 @@ func (b *Builder) keepFile(i FileInfo) (string, bool) {
 }
 
 type marshaler interface {
-	copyFile(Data) error
+	copyFile(Data, []string) error
 
-	marshalData(Data) error
+	marshalData(Data, []string) error
 	marshalMeta(Meta) error
 }
 
@@ -176,14 +176,14 @@ type filebuilder struct {
 	dirtree
 }
 
-func (b *filebuilder) copyFile(d Data) error {
+func (b *filebuilder) copyFile(d Data, ds []string) error {
 	r, err := os.Open(d.Info.File)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
 
-	file := b.prepareFile(d)
+	file := b.prepareFile(d, ds)
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
@@ -198,8 +198,8 @@ func (b *filebuilder) copyFile(d Data) error {
 	return err
 }
 
-func (b *filebuilder) marshalData(d Data) error {
-	file := b.prepareFile(d)
+func (b *filebuilder) marshalData(d Data, ds []string) error {
+	file := b.prepareFile(d, ds)
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
@@ -233,9 +233,9 @@ func (b *filebuilder) marshalMeta(m Meta) error {
 	return encodeMeta(w, m)
 }
 
-func (b *filebuilder) prepareFile(d Data) string {
+func (b *filebuilder) prepareFile(d Data, ds []string) string {
 	var file string
-	if dir := b.Prepare(d); dir != "" {
+	if dir := b.Prepare(d, ds); dir != "" {
 		file = filepath.Join(b.rootdir, dir, filepath.Base(d.Info.File))
 	} else {
 		file = filepath.Join(b.rootdir, d.Rootdir, d.Info.File)
@@ -258,14 +258,14 @@ func (b *zipbuilder) Close() error {
 	return err
 }
 
-func (b *zipbuilder) copyFile(d Data) error {
+func (b *zipbuilder) copyFile(d Data, ds []string) error {
 	r, err := os.Open(d.Info.File)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
 
-	file := b.prepareFile(d)
+	file := b.prepareFile(d, ds)
 	fh := zip.FileHeader{
 		Name:     file,
 		Modified: d.Info.AcqTime,
@@ -278,8 +278,8 @@ func (b *zipbuilder) copyFile(d Data) error {
 	return err
 }
 
-func (b *zipbuilder) marshalData(d Data) error {
-	file := b.prepareFile(d)
+func (b *zipbuilder) marshalData(d Data, ds []string) error {
+	file := b.prepareFile(d, ds)
 	fh := zip.FileHeader{
 		Name:     file + ".xml",
 		Modified: d.Info.AcqTime,
@@ -308,9 +308,9 @@ func (b *zipbuilder) marshalMeta(m Meta) error {
 	return encodeMeta(w, m)
 }
 
-func (b *zipbuilder) prepareFile(d Data) string {
+func (b *zipbuilder) prepareFile(d Data, ds []string) string {
 	var file string
-	if dir := b.Prepare(d); dir != "" {
+	if dir := b.Prepare(d, ds); dir != "" {
 		file = filepath.Join(d.Rootdir, dir, filepath.Base(d.Info.File))
 	} else {
 		file = filepath.Join(d.Rootdir, d.Info.File)
@@ -336,7 +336,10 @@ const (
 
 type dirtree []string
 
-func (d dirtree) Prepare(dat Data) string {
+func (d dirtree) Prepare(dat Data, ds []string) string {
+	if len(ds) > 0 {
+		return dirtree(ds).Prepare(dat, nil)
+	}
 	if len(d) == 0 {
 		return ""
 	}
@@ -349,7 +352,7 @@ func (d dirtree) prepare(dat Data) string {
 	}
 	parts := make([]string, len(d))
 	for i, p := range d {
-		switch p {
+		switch strings.ToLower(p) {
 		case levelSource:
 			parts[i] = replace(dat.Source)
 		case levelModel:

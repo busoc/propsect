@@ -39,6 +39,7 @@ type Config struct {
 	Type      string
 	Mime      string
 	Mimes     []Mime `toml:"mimetype"`
+	Directories []string
 }
 
 func (c Config) GuessType(ext string) (string, string) {

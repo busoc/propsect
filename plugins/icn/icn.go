@@ -30,6 +30,8 @@ const (
 	defaultRole = "uplinked file"
 )
 
+const timePattern = "2006/002 15:04"
+
 type module struct {
 	cfg prospect.Config
 
@@ -93,7 +95,7 @@ func (m *module) Process() (prospect.FileInfo, error) {
 }
 
 func (m *module) startList(row []string) (prospect.FileInfo, error) {
-	i, err := m.processListing(row[0])
+	i, err := m.processListing(row[0], row[6])
 	if err == nil {
 		i.Mime, i.Type = m.cfg.GuessType(filepath.Ext(row[0]))
 		if i.Mime == "" {
@@ -154,7 +156,7 @@ func (m *module) processRecord(row []string) (prospect.FileInfo, error) {
 		newParameter(fileSize, fmt.Sprintf("%d", s.Size())),
 	}
 	if row[6] != "" || row[6] != "-" {
-		i.AcqTime, _ = time.Parse("2006/002 15:04", row[6])
+		i.AcqTime, _ = time.Parse(timePattern, row[6])
 		i.AcqTime = i.AcqTime.UTC()
 		i.Parameters = append(i.Parameters, newParameter(fileUpTime, row[6]))
 	}
@@ -162,7 +164,6 @@ func (m *module) processRecord(row []string) (prospect.FileInfo, error) {
 		i.Parameters = append(i.Parameters, newParameter(fileFerTime, row[7]))
 	}
 
-	// i.AcqTime = s.ModTime().UTC()
 	i.ModTime = s.ModTime().UTC()
 	i.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
 	i.File = r.Name()
@@ -170,7 +171,7 @@ func (m *module) processRecord(row []string) (prospect.FileInfo, error) {
 	return i, nil
 }
 
-func (m *module) processListing(file string) (prospect.FileInfo, error) {
+func (m *module) processListing(file, stamp string) (prospect.FileInfo, error) {
 	var i prospect.FileInfo
 
 	r, err := os.Open(file)
@@ -207,16 +208,20 @@ func (m *module) processListing(file string) (prospect.FileInfo, error) {
 		newParameter(fileSize, fmt.Sprintf("%d", size)),
 		newParameter(fileRecords, fmt.Sprintf("%d", len(refs))),
 	}
-	// dir := filepath.Dir(file)
+
 	for j, r := range refs {
 		ref := fmt.Sprintf(ptrRef, j+1)
-		// i.Parameters = append(i.Parameters, newParameter(ref, filepath.Join(dir, r)))
 		i.Parameters = append(i.Parameters, newParameter(ref, r))
+
 		rol := fmt.Sprintf(ptrRole, j+1)
 		i.Parameters = append(i.Parameters, newParameter(rol, defaultRole))
 	}
 
-	i.AcqTime = s.ModTime().UTC()
+	when, err := time.Parse(timePattern, stamp)
+	if err != nil {
+		when, err = s.ModTime().UTC(), nil
+	}
+	i.AcqTime = when
 	i.ModTime = s.ModTime().UTC()
 	i.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
 	i.File = r.Name()
