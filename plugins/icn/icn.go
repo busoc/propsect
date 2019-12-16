@@ -15,19 +15,21 @@ import (
 )
 
 const (
-	fileSize     = "file.size"
-	fileMD5      = "file.md5"
-	fileOriginal = "uplink.file.local"
-	fileUplink   = "uplink.file.uplink"
-	fileMMU      = "uplink.file.mmu"
-	fileUpTime   = "uplink.time.uplink"
-	fileFerTime  = "uplink.time.transfer"
-	fileSource   = "uplink.source"
-	fileRecords  = "file.numrec"
-	ptrRef       = "ptr.%d.href"
-	ptrRole      = "ptr.%d.role"
+	fileSize = "file.size"
+	fileMD5  = "file.md5"
+	// fileSource   = "uplink.source"
+	// fileOriginal = "uplink.file.local"
+	// fileUplink   = "uplink.file.uplink"
+	// fileMMU      = "uplink.file.mmu"
+	fileMMU     = "uplink.target.path"
+	fileUpTime  = "uplink.time.uplink"
+	fileFerTime = "uplink.time.transfer"
+	fileRecords = "file.numrec"
+	ptrRef      = "ptr.%d.href"
+	ptrRole     = "ptr.%d.role"
 
-	defaultRole = "uplinked file"
+	uplinkRole = "uplinked file"
+	icnRole    = prospect.TypeUplinkNote
 )
 
 const timePattern = "2006/002 15:04"
@@ -148,9 +150,8 @@ func (m *module) processRecord(row []string) (prospect.FileInfo, error) {
 		return i, err
 	}
 	i.Parameters = []prospect.Parameter{
-		newParameter(fileSource, row[0]),
-		newParameter(fileOriginal, row[2]),
-		newParameter(fileUplink, row[1]),
+		newParameter(fmt.Sprintf(ptrRef, 1), row[0]),
+		newParameter(fmt.Sprintf(ptrRole, 1), icnRole),
 		newParameter(fileMMU, row[3]),
 		newParameter(fileMD5, row[10]),
 		newParameter(fileSize, fmt.Sprintf("%d", s.Size())),
@@ -214,7 +215,7 @@ func (m *module) processListing(file, stamp string) (prospect.FileInfo, error) {
 		i.Parameters = append(i.Parameters, newParameter(ref, r))
 
 		rol := fmt.Sprintf(ptrRole, j+1)
-		i.Parameters = append(i.Parameters, newParameter(rol, defaultRole))
+		i.Parameters = append(i.Parameters, newParameter(rol, uplinkRole))
 	}
 
 	when, err := time.Parse(timePattern, stamp)

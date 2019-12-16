@@ -51,6 +51,7 @@ var sources = map[string]string{
 	"0046": "virtual camera #5",
 	"0047": "virtual camera #6",
 	"0051": "Low Rate Science Data",
+	"0090": "svs",
 }
 
 var (

@@ -18,8 +18,8 @@ var (
 )
 
 type Parameter struct {
-	Name  string
-	Value string
+	Name  string `xml:"name"`
+	Value string `xml:"value"`
 }
 
 type Payload struct {

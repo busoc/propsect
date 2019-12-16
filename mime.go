@@ -15,7 +15,7 @@ const (
 const (
 	TypeData         = "data"
 	TypeUplinkFile   = "uplink file"
-	TypeUplinkNote   = "intre-console note"
+	TypeUplinkNote   = "intre console note"
 	TypeHighRateData = "high rate data"
 	TypeRawTelemetry = "medium rate telemetry"
 )

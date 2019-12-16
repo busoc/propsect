@@ -16,10 +16,10 @@ import (
 )
 
 const (
-	fileDuration  = "file.duration"
-	fileRecord    = "file.numrec"
-	fileSize      = "file.size"
-	fileCorrupted = "file.corrupted"
+	fileDuration = "file.duration"
+	fileRecord   = "file.numrec"
+	fileSize     = "file.size"
+	pktCorrupted = "pkt.corrupted"
 )
 
 type module struct {
@@ -100,7 +100,13 @@ func (m module) readFile(rs io.Reader) ([]prospect.Parameter, error) {
 				{Name: fileDuration, Value: "300s"},
 				{Name: fileRecord, Value: fmt.Sprintf("%d", i)},
 				{Name: fileSize, Value: fmt.Sprintf("%d", size)},
-				{Name: fileCorrupted, Value: fmt.Sprintf("%t", err != io.EOF)},
+			}
+			if err != io.EOF {
+				p := prospect.Parameter{
+					Name:  pktCorrupted,
+					Value: fmt.Sprintf("%t", err != io.EOF),
+				}
+				ps = append(ps, p)
 			}
 			return ps, nil
 		} else {

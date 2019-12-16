@@ -22,6 +22,7 @@ type Builder struct {
 
 	dryrun bool
 
+	levels []string
 	marshaler
 }
 
@@ -59,6 +60,7 @@ func NewBuilder(file string) (*Builder, error) {
 		data:      c.Data,
 		modules:   c.Plugins,
 		sources:   c.Periods,
+		levels:    c.Levels,
 		marshaler: m,
 	}
 	return &b, nil
@@ -79,7 +81,7 @@ func (b *Builder) Build() error {
 		if m.Type == "" {
 			m.Type = b.data.Type
 		}
-		mod, err := m.Open()
+		mod, err := m.Open(b.levels)
 		if err != nil {
 			return err
 		}

@@ -33,14 +33,18 @@ type Module interface {
 }
 
 type Config struct {
-	Integrity string
-	Module    string
-	Location  string
-	Type      string
-	Mime      string
-	Mimes     []Mime `toml:"mimetype"`
-	Directories []string
+	Integrity   string
+	Module      string
+	Location    string
+	Type        string
+	Mime        string
+	Mimes       []Mime `toml:"mimetype"`
+	Directories dirtree
 }
+
+// func (c Config) Prepare(base string) string {
+// 	return c.Directories.Prepare(base, nil)
+// }
 
 func (c Config) GuessType(ext string) (string, string) {
 	for _, m := range c.Mimes {
@@ -69,7 +73,7 @@ func (c Config) Hash() hash.Hash {
 	return h
 }
 
-func (c Config) Open() (Module, error) {
+func (c Config) Open(levels []string) (Module, error) {
 	if c.Module == "" {
 		return nil, ErrSkip
 	}
@@ -80,6 +84,9 @@ func (c Config) Open() (Module, error) {
 	sym, err := g.Lookup("New")
 	if err != nil {
 		return nil, err
+	}
+	if len(c.Directories) == 0 {
+		c.Directories = append(c.Directories, levels...)
 	}
 	switch fn := sym.(type) {
 	case func(Config) Module:
