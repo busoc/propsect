@@ -27,12 +27,6 @@ type Builder struct {
 }
 
 func NewBuilder(file string) (*Builder, error) {
-	r, err := os.Open(file)
-	if err != nil {
-		return nil, err
-	}
-	defer r.Close()
-
 	c := struct {
 		Archive string
 		Dry     bool     `toml:"no-data"`
@@ -43,7 +37,7 @@ func NewBuilder(file string) (*Builder, error) {
 		Plugins []Config   `toml:"module"`
 		Periods []Activity `toml:"period"`
 	}{}
-	if err := toml.NewDecoder(r).Decode(&c); err != nil {
+	if err := toml.DecodeFile(file, &c); err != nil {
 		return nil, err
 	}
 	if err := os.MkdirAll(filepath.Dir(c.Archive), 0755); err != nil {
@@ -125,7 +119,7 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 
 func (b *Builder) keepFile(i FileInfo) (string, bool) {
 	if len(b.sources) == 0 {
-		return "", true
+		return "Local", true
 	}
 	if i.File == "" {
 		return "", false
@@ -152,10 +146,11 @@ type marshaler interface {
 func newMarshaler(file string, levels []string) (marshaler, error) {
 	ext := filepath.Ext(file)
 	if i, _ := os.Stat(file); ext == "" || i.IsDir() {
-		return &filebuilder{
+		f := filebuilder{
 			rootdir: file,
 			dirtree: dirtree(levels),
-		}, nil
+		}
+		return &f, nil
 	}
 
 	w, err := os.Create(file)

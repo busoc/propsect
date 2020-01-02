@@ -42,10 +42,6 @@ type Config struct {
 	Directories dirtree
 }
 
-// func (c Config) Prepare(base string) string {
-// 	return c.Directories.Prepare(base, nil)
-// }
-
 func (c Config) GuessType(ext string) (string, string) {
 	for _, m := range c.Mimes {
 		if mi, ty, ok := m.Has(ext); ok {

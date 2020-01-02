@@ -4,13 +4,9 @@ import (
 	"encoding/xml"
 	"errors"
 	"io"
-	// "path/filepath"
-	// "sort"
 	"strings"
 	"time"
 )
-
-const DefaultMime = "application/octet-stream"
 
 var (
 	ErrSkip = errors.New("skip module")
@@ -70,8 +66,8 @@ func (m *Meta) MarshalXML(e *xml.Encoder, _ xml.StartElement) error {
 }
 
 type Activity struct {
-	Type   string `toml:"source"`
-	Name   string
+	// Name   string
+	Type   string    `toml:"source"`
 	Starts time.Time `toml:"dtstart"`
 	Ends   time.Time `toml:"dtend"`
 }
