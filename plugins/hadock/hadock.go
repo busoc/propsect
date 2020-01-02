@@ -3,12 +3,14 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/xml"
 	"fmt"
 	"hash"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,15 +20,26 @@ import (
 
 const (
 	fileSize     = "file.size"
-	fileChannel  = "hrd.channel"
-	fileSource   = "hrd.source"
-	fileUPI      = "hrd.upi"
-	fileInstance = "hrd.instance"
-	fileMode     = "hrd.mode"
-	fileFCC      = "hrd.fcc"
-	fileWidth    = "hrd.pixels.x"
-	fileHeight   = "hrd.pixels.y"
-	fileBad      = "hrd.invalid"
+	fileChannel  = "hpkt.vmu2.hci"
+	fileOid      = "hpkt.vmu2.origin"
+	fileSource   = "hpkt.vmu2.source"
+	fileUPI      = "hpkt.vmu2.upi"
+	fileInstance = "hpkt.vmu2.instance"
+	fileMode     = "hpkt.vmu2.mode"
+	fileFCC      = "hpkt.vmu2.fmt"
+	fileWidth    = "hpkt.vmu2.pixels.x"
+	fileHeight   = "hpkt.vmu2.pixels.y"
+	fileBad      = "hpkt.vmu2.invalid"
+	fileRoiOffX  = "hpkt.vmu2.roi.xof"
+	fileRoiSizX  = "hpkt.vmu2.roi.xsz"
+	fileRoiOffY  = "hpkt.vmu2.roi.yof"
+	fileRoiSizY  = "hpkt.vmu2.roi.ysz"
+	fileDrop     = "hpkt.vmu2.fdrp"
+	fileScalSizX = "hpkt.vmu2.scale.xsz"
+	fileScalSizY = "hpkt.vmu2.scale.ysz"
+	fileScalFar  = "hpkt.vmu2.scale.far"
+
+	scienceRun = "scienceRun"
 )
 
 const (
@@ -71,6 +84,29 @@ var (
 	SVS  = []byte("SVS ")
 	TIFF = []byte("TIFF")
 )
+
+type metadata struct {
+	PktTime string `xml:"vmu,attr"`
+
+	AcqTime string `xml:"timestamp"`
+	SizeX   int    `xml:"pixels>x"`
+	SizeY   int    `xml:"pixels>y"`
+
+	Region struct {
+		OffsetX int `xml:"offset-x"`
+		SizeX   int `xml:"size-x"`
+		OffsetY int `xml:"offset-y"`
+		SizeY   int `xml:"size-y"`
+	} `xml:"region"`
+
+	Dropping int
+
+	Scale struct {
+		SizeX int `xml:"size-x"`
+		SizeY int `xml:"size-y"`
+	} `xml:"scaling"`
+	Ratio int `xml:"force-aspect-ratio"`
+}
 
 type module struct {
 	cfg prospect.Config
@@ -143,13 +179,28 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 		i.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
 		i.AcqTime = timeFromFile(file)
 
-		i.Parameters = ps
-		if ps, err = parseFilename(file); err == nil {
-			i.Parameters = append(i.Parameters, ps...)
+		if xs, err := parseFilename(file); err == nil {
+			ps = append(ps, xs...)
 		}
 		if s, err := r.Stat(); err == nil {
 			i.ModTime = s.ModTime().UTC()
 		}
+		if r, err := os.Open(file + ".xml"); err == nil {
+			defer r.Close()
+			var m metadata
+			if err := xml.NewDecoder(r).Decode(&m); err != nil {
+				return prospect.FileInfo{}, err
+			}
+			ps = append(ps, newParameter(fileRoiOffX, strconv.Itoa(m.Region.OffsetX)))
+			ps = append(ps, newParameter(fileRoiSizX, strconv.Itoa(m.Region.SizeX)))
+			ps = append(ps, newParameter(fileRoiOffY, strconv.Itoa(m.Region.OffsetY)))
+			ps = append(ps, newParameter(fileRoiSizY, strconv.Itoa(m.Region.SizeY)))
+			ps = append(ps, newParameter(fileDrop, strconv.Itoa(m.Dropping)))
+			ps = append(ps, newParameter(fileScalSizX, strconv.Itoa(m.Scale.SizeX)))
+			ps = append(ps, newParameter(fileScalSizY, strconv.Itoa(m.Scale.SizeY)))
+			ps = append(ps, newParameter(fileScalFar, strconv.Itoa(m.Ratio)))
+		}
+		i.Parameters = append(i.Parameters, ps...)
 	}
 	return i, nil
 }
@@ -187,10 +238,18 @@ func parseFilename(file string) ([]prospect.Parameter, error) {
 	parts := strings.Split(file, "_")
 
 	ps := make([]prospect.Parameter, 0, 10)
-	if src, ok := sources[parts[0]]; ok {
+	src, ok := sources[parts[0]]
+	if ok {
 		ps = append(ps, newParameter(fileSource, src))
 	}
-	ps = append(ps, newParameter(fileUPI, parts[1]))
+	ps = append(ps, newParameter(fileOid, strings.TrimLeft(parts[0], "0")))
+
+	var upi []string
+	for i := 1; i < len(parts)-5; i++ {
+		upi = append(upi, parts[i])
+	}
+	ps = append(ps, newParameter(fileUPI, strings.Join(upi, "_")))
+	ps = append(ps, newParameter(scienceRun, strings.Join(upi, "_")))
 
 	switch parts[2] {
 	case "1", "2":
@@ -218,8 +277,9 @@ func parseFilename(file string) ([]prospect.Parameter, error) {
 		ps = append(ps, newParameter(fileInstance, "TEST"))
 	}
 
-	bad := filepath.Ext(file) == ".bad"
-	ps = append(ps, newParameter(fileBad, fmt.Sprintf("%t", bad)))
+	if bad := filepath.Ext(file) == ".bad"; bad {
+		ps = append(ps, newParameter(fileBad, fmt.Sprintf("%t", bad)))
+	}
 
 	return ps, nil
 }
