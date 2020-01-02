@@ -113,17 +113,21 @@ type module struct {
 
 	buf    []byte
 	digest hash.Hash
-	source *glob.Globber
+	source *glob.Glob
 }
 
-func New(cfg prospect.Config) prospect.Module {
+func New(cfg prospect.Config) (prospect.Module, error) {
 	m := module{
 		cfg:    cfg,
 		buf:    make([]byte, 8<<20),
 		digest: cfg.Hash(),
-		source: glob.New("", cfg.Location),
 	}
-	return m
+
+	g, err := glob.New(cfg.Location)
+	if err == nil {
+		m.source = g
+	}
+	return m, err
 }
 
 func (m module) String() string {

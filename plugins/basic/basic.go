@@ -19,15 +19,20 @@ type module struct {
 	cfg prospect.Config
 
 	digest hash.Hash
-	source *glob.Globber
+	source *glob.Glob
 }
 
-func New(cfg prospect.Config) prospect.Module {
-	return module{
+func New(cfg prospect.Config) (prospect.Module, error) {
+	m := module{
 		cfg:    cfg,
 		digest: cfg.Hash(),
-		source: glob.New("", cfg.Location),
 	}
+
+	g, err := glob.New(cfg.Location)
+	if err == nil {
+		m.source = g
+	}
+	return m, err
 }
 
 func (m module) String() string {
