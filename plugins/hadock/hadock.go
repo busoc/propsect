@@ -195,14 +195,14 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 			if err := xml.NewDecoder(r).Decode(&m); err != nil {
 				return prospect.FileInfo{}, err
 			}
-			ps = append(ps, newParameter(fileRoiOffX, strconv.Itoa(m.Region.OffsetX)))
-			ps = append(ps, newParameter(fileRoiSizX, strconv.Itoa(m.Region.SizeX)))
-			ps = append(ps, newParameter(fileRoiOffY, strconv.Itoa(m.Region.OffsetY)))
-			ps = append(ps, newParameter(fileRoiSizY, strconv.Itoa(m.Region.SizeY)))
-			ps = append(ps, newParameter(fileDrop, strconv.Itoa(m.Dropping)))
-			ps = append(ps, newParameter(fileScalSizX, strconv.Itoa(m.Scale.SizeX)))
-			ps = append(ps, newParameter(fileScalSizY, strconv.Itoa(m.Scale.SizeY)))
-			ps = append(ps, newParameter(fileScalFar, strconv.Itoa(m.Ratio)))
+			ps = append(ps, prospect.MakeParameter(fileRoiOffX, strconv.Itoa(m.Region.OffsetX)))
+			ps = append(ps, prospect.MakeParameter(fileRoiSizX, strconv.Itoa(m.Region.SizeX)))
+			ps = append(ps, prospect.MakeParameter(fileRoiOffY, strconv.Itoa(m.Region.OffsetY)))
+			ps = append(ps, prospect.MakeParameter(fileRoiSizY, strconv.Itoa(m.Region.SizeY)))
+			ps = append(ps, prospect.MakeParameter(fileDrop, strconv.Itoa(m.Dropping)))
+			ps = append(ps, prospect.MakeParameter(fileScalSizX, strconv.Itoa(m.Scale.SizeX)))
+			ps = append(ps, prospect.MakeParameter(fileScalSizY, strconv.Itoa(m.Scale.SizeY)))
+			ps = append(ps, prospect.MakeParameter(fileScalFar, strconv.Itoa(m.Ratio)))
 		}
 		i.Parameters = append(i.Parameters, ps...)
 	}
@@ -219,20 +219,20 @@ func readFile(rs io.Reader) ([]prospect.Parameter, error) {
 		return nil, err
 	}
 
-	ps = append(ps, newParameter(fileFCC, strings.TrimSpace(string(buf[:4]))))
+	ps = append(ps, prospect.MakeParameter(fileFCC, strings.TrimSpace(string(buf[:4]))))
 	if isImage(buf[:4]) {
 		var (
 			x = binary.BigEndian.Uint16(buf[16:])
 			y = binary.BigEndian.Uint16(buf[18:])
 		)
-		ps = append(ps, newParameter(fileWidth, fmt.Sprintf("%d", x)))
-		ps = append(ps, newParameter(fileHeight, fmt.Sprintf("%d", y)))
+		ps = append(ps, prospect.MakeParameter(fileWidth, fmt.Sprintf("%d", x)))
+		ps = append(ps, prospect.MakeParameter(fileHeight, fmt.Sprintf("%d", y)))
 	}
 
 	n, err := io.Copy(ioutil.Discard, rs)
 	if err == nil {
 		size := int(n) + len(buf)
-		ps = append(ps, newParameter(fileSize, fmt.Sprintf("%d", size)))
+		ps = append(ps, prospect.MakeParameter(fileSize, fmt.Sprintf("%d", size)))
 	}
 	return ps, nil
 }
@@ -244,45 +244,45 @@ func parseFilename(file string) ([]prospect.Parameter, error) {
 	ps := make([]prospect.Parameter, 0, 10)
 	src, ok := sources[parts[0]]
 	if ok {
-		ps = append(ps, newParameter(fileSource, src))
+		ps = append(ps, prospect.MakeParameter(fileSource, src))
 	}
-	ps = append(ps, newParameter(fileOid, strings.TrimLeft(parts[0], "0")))
+	ps = append(ps, prospect.MakeParameter(fileOid, strings.TrimLeft(parts[0], "0")))
 
 	var upi []string
 	for i := 1; i < len(parts)-5; i++ {
 		upi = append(upi, parts[i])
 	}
-	ps = append(ps, newParameter(fileUPI, strings.Join(upi, "_")))
-	ps = append(ps, newParameter(scienceRun, strings.Join(upi, "_")))
+	ps = append(ps, prospect.MakeParameter(fileUPI, strings.Join(upi, "_")))
+	ps = append(ps, prospect.MakeParameter(scienceRun, strings.Join(upi, "_")))
 
 	switch parts[2] {
 	case "1", "2":
-		ps = append(ps, newParameter(fileChannel, chanVic+parts[2]))
+		ps = append(ps, prospect.MakeParameter(fileChannel, chanVic+parts[2]))
 	case "3":
-		ps = append(ps, newParameter(fileChannel, chanLrsd))
+		ps = append(ps, prospect.MakeParameter(fileChannel, chanLrsd))
 	default:
 	}
 
 	switch {
 	case strings.Index(dir, "playback") >= 0:
-		ps = append(ps, newParameter(fileMode, "playback"))
+		ps = append(ps, prospect.MakeParameter(fileMode, "playback"))
 	case strings.Index(dir, "realtime") >= 0:
-		ps = append(ps, newParameter(fileMode, "realtime"))
+		ps = append(ps, prospect.MakeParameter(fileMode, "realtime"))
 	}
 
 	switch {
 	case strings.Index(dir, "OPS") >= 0:
-		ps = append(ps, newParameter(fileInstance, "OPS"))
+		ps = append(ps, prospect.MakeParameter(fileInstance, "OPS"))
 	case strings.Index(dir, "SIM1") >= 0:
-		ps = append(ps, newParameter(fileInstance, "SIM1"))
+		ps = append(ps, prospect.MakeParameter(fileInstance, "SIM1"))
 	case strings.Index(dir, "SIM2") >= 0:
-		ps = append(ps, newParameter(fileInstance, "SIM2"))
+		ps = append(ps, prospect.MakeParameter(fileInstance, "SIM2"))
 	case strings.Index(dir, "TEST") >= 0:
-		ps = append(ps, newParameter(fileInstance, "TEST"))
+		ps = append(ps, prospect.MakeParameter(fileInstance, "TEST"))
 	}
 
 	if bad := filepath.Ext(file) == ".bad"; bad {
-		ps = append(ps, newParameter(fileBad, fmt.Sprintf("%t", bad)))
+		ps = append(ps, prospect.MakeParameter(fileBad, fmt.Sprintf("%t", bad)))
 	}
 
 	return ps, nil
@@ -306,8 +306,4 @@ func isImage(fcc []byte) bool {
 	case bytes.Equal(fcc, SVS):
 	}
 	return false
-}
-
-func newParameter(k, v string) prospect.Parameter {
-	return prospect.Parameter{Name: k, Value: v}
 }

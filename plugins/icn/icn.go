@@ -146,19 +146,19 @@ func (m *module) processRecord(row []string) (prospect.FileInfo, error) {
 		return i, err
 	}
 	i.Parameters = []prospect.Parameter{
-		newParameter(fmt.Sprintf(ptrRef, 1), row[0]),
-		newParameter(fmt.Sprintf(ptrRole, 1), icnRole),
-		newParameter(fileMMU, row[3]),
-		newParameter(fileMD5, row[10]),
-		newParameter(fileSize, fmt.Sprintf("%d", s.Size())),
+		prospect.MakeParameter(fmt.Sprintf(ptrRef, 1), row[0]),
+		prospect.MakeParameter(fmt.Sprintf(ptrRole, 1), icnRole),
+		prospect.MakeParameter(fileMMU, row[3]),
+		prospect.MakeParameter(fileMD5, row[10]),
+		prospect.MakeParameter(fileSize, fmt.Sprintf("%d", s.Size())),
 	}
 	if row[6] != "" || row[6] != "-" {
 		i.AcqTime, _ = time.Parse(timePattern, row[6])
 		i.AcqTime = i.AcqTime.UTC()
-		i.Parameters = append(i.Parameters, newParameter(fileUpTime, row[6]))
+		i.Parameters = append(i.Parameters, prospect.MakeParameter(fileUpTime, row[6]))
 	}
 	if row[7] != "" || row[7] != "-" {
-		i.Parameters = append(i.Parameters, newParameter(fileFerTime, row[7]))
+		i.Parameters = append(i.Parameters, prospect.MakeParameter(fileFerTime, row[7]))
 	}
 
 	i.ModTime = s.ModTime().UTC()
@@ -202,16 +202,16 @@ func (m *module) processListing(file, stamp string) (prospect.FileInfo, error) {
 		return i, err
 	}
 	i.Parameters = []prospect.Parameter{
-		newParameter(fileSize, fmt.Sprintf("%d", size)),
-		newParameter(fileRecords, fmt.Sprintf("%d", len(refs))),
+		prospect.MakeParameter(fileSize, fmt.Sprintf("%d", size)),
+		prospect.MakeParameter(fileRecords, fmt.Sprintf("%d", len(refs))),
 	}
 
 	for j, r := range refs {
 		ref := fmt.Sprintf(ptrRef, j+1)
-		i.Parameters = append(i.Parameters, newParameter(ref, r))
+		i.Parameters = append(i.Parameters, prospect.MakeParameter(ref, r))
 
 		rol := fmt.Sprintf(ptrRole, j+1)
-		i.Parameters = append(i.Parameters, newParameter(rol, uplinkRole))
+		i.Parameters = append(i.Parameters, prospect.MakeParameter(rol, uplinkRole))
 	}
 
 	when, err := time.Parse(timePattern, stamp)
@@ -232,11 +232,4 @@ func openFile(file string) (*os.File, error) {
 		return r, nil
 	}
 	return os.Open(file + ".DAT")
-}
-
-func newParameter(n, v string) prospect.Parameter {
-	return prospect.Parameter{
-		Name:  n,
-		Value: v,
-	}
 }

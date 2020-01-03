@@ -101,16 +101,12 @@ func (m module) readFile(rs io.Reader) ([]prospect.Parameter, error) {
 	for i := 0; ; i++ {
 		if n, err := rs.Read(m.buf); err != nil {
 			ps := []prospect.Parameter{
-				{Name: fileDuration, Value: "300s"},
-				{Name: fileRecord, Value: fmt.Sprintf("%d", i)},
-				{Name: fileSize, Value: fmt.Sprintf("%d", size)},
+				prospect.MakeParameter(fileDuration, "300s"),
+				prospect.MakeParameter(fileRecord, fmt.Sprintf("%d", i)),
+				prospect.MakeParameter(fileSize, fmt.Sprintf("%d", size)),
 			}
 			if err != io.EOF {
-				p := prospect.Parameter{
-					Name:  pktCorrupted,
-					Value: fmt.Sprintf("%t", err != io.EOF),
-				}
-				ps = append(ps, p)
+				ps = append(ps, prospect.MakeParameter(pktCorrupted, fmt.Sprintf("%t", err != io.EOF)))
 			}
 			return ps, nil
 		} else {
