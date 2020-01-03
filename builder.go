@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -15,23 +14,21 @@ import (
 )
 
 type Builder struct {
-	meta    Meta
-	data    Data
-	modules []Config
-
+	meta     Meta
+	data     Data
+	modules  []Config
 	schedule Schedule
 
 	dryrun bool
 
-	levels []string
 	marshaler
 }
 
 func NewBuilder(file, schedule string) (*Builder, error) {
 	c := struct {
 		Archive string
-		Dry     bool     `toml:"no-data"`
-		Levels  []string `toml:"directories"`
+		Dry     bool `toml:"no-data"`
+		Path    string
 
 		Meta
 		Data    `toml:"dataset"`
@@ -43,7 +40,7 @@ func NewBuilder(file, schedule string) (*Builder, error) {
 	if err := os.MkdirAll(filepath.Dir(c.Archive), 0755); err != nil {
 		return nil, err
 	}
-	m, err := newMarshaler(c.Archive, c.Levels)
+	m, err := newMarshaler(c.Archive, c.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +50,6 @@ func NewBuilder(file, schedule string) (*Builder, error) {
 		meta:      c.Meta,
 		data:      c.Data,
 		modules:   c.Plugins,
-		levels:    c.Levels,
 		marshaler: m,
 	}
 	if b.data.Model == "" {
@@ -78,7 +74,7 @@ func (b *Builder) Build() error {
 		if m.Type == "" {
 			m.Type = b.data.Type
 		}
-		mod, err := m.Open(b.levels)
+		mod, err := m.Open()
 		if err != nil {
 			return err
 		}
@@ -90,6 +86,10 @@ func (b *Builder) Build() error {
 }
 
 func (b *Builder) executeModule(mod Module, cfg Config) error {
+	resolve, err := Parse(cfg.Path)
+	if err != nil && cfg.Path != "" {
+		return err
+	}
 	for {
 		switch i, err := mod.Process(); err {
 		case nil:
@@ -103,11 +103,11 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 			x.Source = src
 			x.Info = i
 
-			if err := b.marshalData(x, cfg.Directories); err != nil {
+			if err := b.marshalData(x, resolve); err != nil {
 				return err
 			}
 			if !b.dryrun {
-				if err := b.copyFile(x, cfg.Directories); err != nil {
+				if err := b.copyFile(x, resolve); err != nil {
 					return err
 				}
 			}
@@ -121,18 +121,23 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 }
 
 type marshaler interface {
-	copyFile(Data, []string) error
+	copyFile(Data, resolver) error
 
-	marshalData(Data, []string) error
+	marshalData(Data, resolver) error
 	marshalMeta(Meta) error
 }
 
-func newMarshaler(file string, levels []string) (marshaler, error) {
+func newMarshaler(file, path string) (marshaler, error) {
+	r, err := Parse(path)
+	if err != nil {
+		return nil, err
+	}
+
 	ext := filepath.Ext(file)
 	if i, _ := os.Stat(file); ext == "" || i.IsDir() {
 		f := filebuilder{
-			rootdir: file,
-			dirtree: dirtree(levels),
+			rootdir:  file,
+			resolver: r,
 		}
 		return &f, nil
 	}
@@ -141,10 +146,11 @@ func newMarshaler(file string, levels []string) (marshaler, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	z := zipbuilder{
-		Closer:  w,
-		writer:  zip.NewWriter(w),
-		dirtree: dirtree(levels),
+		Closer:   w,
+		writer:   zip.NewWriter(w),
+		resolver: r,
 	}
 	z.writer.RegisterCompressor(zip.Deflate, func(w io.Writer) (io.WriteCloser, error) {
 		return flate.NewWriter(w, flate.BestCompression)
@@ -154,17 +160,17 @@ func newMarshaler(file string, levels []string) (marshaler, error) {
 
 type filebuilder struct {
 	rootdir string
-	dirtree
+	resolver
 }
 
-func (b *filebuilder) copyFile(d Data, ds []string) error {
+func (b *filebuilder) copyFile(d Data, rs resolver) error {
 	r, err := os.Open(d.Info.File)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
 
-	file := b.prepareFile(d, ds)
+	file := b.prepareFile(d, rs)
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
@@ -179,8 +185,8 @@ func (b *filebuilder) copyFile(d Data, ds []string) error {
 	return err
 }
 
-func (b *filebuilder) marshalData(d Data, ds []string) error {
-	file := b.prepareFile(d, ds)
+func (b *filebuilder) marshalData(d Data, rs resolver) error {
+	file := b.prepareFile(d, rs)
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
@@ -214,9 +220,12 @@ func (b *filebuilder) marshalMeta(m Meta) error {
 	return encodeMeta(w, m)
 }
 
-func (b *filebuilder) prepareFile(d Data, ds []string) string {
+func (b *filebuilder) prepareFile(d Data, r resolver) string {
 	var file string
-	if dir := b.Prepare(d, ds); dir != "" {
+	if r == nil {
+		r = b.resolver
+	}
+	if dir := r.Resolve(d); dir != "" {
 		file = filepath.Join(b.rootdir, dir, filepath.Base(d.Info.File))
 	} else {
 		file = filepath.Join(b.rootdir, d.Rootdir, d.Info.File)
@@ -228,7 +237,7 @@ type zipbuilder struct {
 	io.Closer
 	writer *zip.Writer
 
-	dirtree
+	resolver
 }
 
 func (b *zipbuilder) Close() error {
@@ -239,14 +248,14 @@ func (b *zipbuilder) Close() error {
 	return err
 }
 
-func (b *zipbuilder) copyFile(d Data, ds []string) error {
+func (b *zipbuilder) copyFile(d Data, rs resolver) error {
 	r, err := os.Open(d.Info.File)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
 
-	file := b.prepareFile(d, ds)
+	file := b.prepareFile(d, rs)
 	fh := zip.FileHeader{
 		Name:     file,
 		Modified: d.Info.AcqTime,
@@ -259,8 +268,8 @@ func (b *zipbuilder) copyFile(d Data, ds []string) error {
 	return err
 }
 
-func (b *zipbuilder) marshalData(d Data, ds []string) error {
-	file := b.prepareFile(d, ds)
+func (b *zipbuilder) marshalData(d Data, rs resolver) error {
+	file := b.prepareFile(d, rs)
 	fh := zip.FileHeader{
 		Name:     file + ".xml",
 		Modified: d.Info.AcqTime,
@@ -289,89 +298,15 @@ func (b *zipbuilder) marshalMeta(m Meta) error {
 	return encodeMeta(w, m)
 }
 
-func (b *zipbuilder) prepareFile(d Data, ds []string) string {
+func (b *zipbuilder) prepareFile(d Data, r resolver) string {
 	var file string
-	if dir := b.Prepare(d, ds); dir != "" {
+	if r == nil {
+		r = b.resolver
+	}
+	if dir := r.Resolve(d); dir != "" {
 		file = filepath.Join(d.Rootdir, dir, filepath.Base(d.Info.File))
 	} else {
 		file = filepath.Join(d.Rootdir, d.Info.File)
 	}
 	return file
-}
-
-const (
-	levelSource = "source"
-	levelModel  = "model"
-	levelMime   = "mime"
-	levelFormat = "format"
-	levelType   = "type"
-	levelYear   = "year"
-	levelDoy    = "doy"
-	levelMonth  = "month"
-	levelDay    = "day"
-	levelHour   = "hour"
-	levelMin    = "minute"
-	levelSec    = "second"
-	levelStamp  = "timestamp"
-)
-
-type dirtree []string
-
-func (d dirtree) Prepare(dat Data, ds []string) string {
-	if len(ds) > 0 {
-		return dirtree(ds).Prepare(dat, nil)
-	}
-	if len(d) == 0 {
-		return ""
-	}
-	return d.prepare(dat)
-}
-
-func (d dirtree) prepare(dat Data) string {
-	replace := func(str string) string {
-		return strings.ReplaceAll(strings.Title(str), " ", "")
-	}
-	parts := make([]string, len(d))
-	for i, p := range d {
-		switch strings.ToLower(p) {
-		case levelSource:
-			parts[i] = replace(dat.Source)
-		case levelModel:
-			parts[i] = replace(dat.Model)
-		case levelMime, levelFormat:
-			parts[i] = replace(parseMime(dat.Info.Mime))
-		case levelType:
-			parts[i] = replace(dat.Info.Type)
-		case levelYear:
-			parts[i] = strconv.Itoa(dat.Info.AcqTime.Year())
-		case levelDoy:
-			parts[i] = fmt.Sprintf("%03d", dat.Info.AcqTime.YearDay())
-		case levelMonth:
-			parts[i] = fmt.Sprintf("%02d", dat.Info.AcqTime.Month())
-		case levelDay:
-			parts[i] = fmt.Sprintf("%02d", dat.Info.AcqTime.Day())
-		case levelHour:
-			parts[i] = fmt.Sprintf("%02d", dat.Info.AcqTime.Hour())
-		case levelMin:
-			parts[i] = fmt.Sprintf("%02d", dat.Info.AcqTime.Minute())
-		case levelSec:
-			parts[i] = fmt.Sprintf("%02d", dat.Info.AcqTime.Second())
-		case levelStamp:
-			u := dat.Info.AcqTime.Unix()
-			parts[i] = strconv.Itoa(int(u))
-		default:
-			parts[i] = p
-		}
-	}
-	return filepath.Join(parts...)
-}
-
-func parseMime(mime string) string {
-	if ix := strings.Index(mime, "/"); ix >= 0 && ix+1 < len(mime) {
-		mime = mime[ix+1:]
-	}
-	if ix := strings.Index(mime, ";"); ix >= 0 {
-		mime = mime[:ix]
-	}
-	return mime
 }

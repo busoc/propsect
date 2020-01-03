@@ -8,6 +8,9 @@ import (
 )
 
 func Parse(str string) (resolver, error) {
+	if str == "" {
+		return nil, nil
+	}
 	var (
 		rs    []resolver
 		parts = strings.Split(strings.Trim(str, "/"), "/")
@@ -19,12 +22,29 @@ func Parse(str string) (resolver, error) {
 		}
 		rs = append(rs, r)
 	}
+
 	return path{rs: rs}, nil
 }
 
 const (
 	lcurly = '{'
 	rcurly = '}'
+)
+
+const (
+	levelSource = "source"
+	levelModel  = "model"
+	levelMime   = "mime"
+	levelFormat = "format"
+	levelType   = "type"
+	levelYear   = "year"
+	levelDoy    = "doy"
+	levelMonth  = "month"
+	levelDay    = "day"
+	levelHour   = "hour"
+	levelMin    = "minute"
+	levelSec    = "second"
+	levelStamp  = "timestamp"
 )
 
 func parse(str string) (resolver, error) {
@@ -69,6 +89,26 @@ type resolver interface {
 	fmt.Stringer
 }
 
+type path struct {
+	rs []resolver
+}
+
+func (p path) Resolve(dat Data) string {
+	str := make([]string, len(p.rs))
+	for j := range p.rs {
+		str[j] = p.rs[j].Resolve(dat)
+	}
+	return filepath.Join(str...)
+}
+
+func (p path) String() string {
+	str := make([]string, len(p.rs))
+	for j := range p.rs {
+		str[j] = p.rs[j].String()
+	}
+	return fmt.Sprintf("path(%s)", filepath.Join(str...))
+}
+
 type literal string
 
 func (i literal) Resolve(_ Data) string {
@@ -97,7 +137,7 @@ func (f fragment) Resolve(dat Data) string {
 	case levelModel:
 		str = replace(dat.Model)
 	case levelMime, levelFormat:
-		str = replace(parseMime(dat.Info.Mime))
+		str = replace(splitMime(dat.Info.Mime))
 	case levelType:
 		str = replace(dat.Info.Type)
 	case levelYear:
@@ -145,22 +185,12 @@ func (c compound) String() string {
 	return fmt.Sprintf("compound(%s)", buf.String())
 }
 
-type path struct {
-	rs []resolver
-}
-
-func (p path) Resolve(dat Data) string {
-	str := make([]string, len(p.rs))
-	for j := range p.rs {
-		str[j] = p.rs[j].Resolve(dat)
+func splitMime(mime string) string {
+	if ix := strings.Index(mime, "/"); ix >= 0 && ix+1 < len(mime) {
+		mime = mime[ix+1:]
 	}
-	return filepath.Join(str...)
-}
-
-func (p path) String() string {
-	str := make([]string, len(p.rs))
-	for j := range p.rs {
-		str[j] = p.rs[j].String()
+	if ix := strings.Index(mime, ";"); ix >= 0 {
+		mime = mime[:ix]
 	}
-	return fmt.Sprintf("path(%s)", filepath.Join(str...))
+	return mime
 }
