@@ -55,6 +55,9 @@ func NewBuilder(file, schedule string) (*Builder, error) {
 	if b.data.Model == "" {
 		b.data.Model = DefaultModel
 	}
+	b.meta.Starts = b.meta.Starts.UTC()
+	b.meta.Ends = b.meta.Ends.UTC()
+
 	b.schedule, err = loadSchedule(schedule, b.meta.Starts, b.meta.Ends)
 	return &b, err
 }
@@ -93,10 +96,11 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 	for {
 		switch i, err := mod.Process(); err {
 		case nil:
-			src := b.schedule.Keep(i)
+			src, ps := b.schedule.Keep(i)
 			if src == "" {
 				continue
 			}
+			i.Parameters = append(i.Parameters, ps...)
 
 			x := b.data
 			x.Experiment = b.meta.Name

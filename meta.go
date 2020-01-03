@@ -31,6 +31,14 @@ type Parameter struct {
 	Value string `xml:"value"`
 }
 
+func MakeParameter(k, v string) Parameter {
+	p := Parameter{
+		Name:  k,
+		Value: v,
+	}
+	return p
+}
+
 type Payload struct {
 	XMLName xml.Name `toml:"-" xml:"payload"`
 	Accr    string   `toml:"acronym" xml:"-"`
@@ -62,6 +70,7 @@ func loadSchedule(file string, starts, ends time.Time) (Schedule, error) {
 		for _, f := range timePattern {
 			when, err = time.Parse(f, dt)
 			if err == nil {
+				when = when.UTC()
 				break
 			}
 		}
@@ -97,25 +106,40 @@ func loadSchedule(file string, starts, ends time.Time) (Schedule, error) {
 	}
 }
 
-func (s Schedule) Keep(i FileInfo) string {
+func (s Schedule) Keep(i FileInfo) (string, []Parameter) {
 	if i.AcqTime.IsZero() {
-		return ""
+		return "", nil
 	}
 	if len(s.as) == 0 {
-		return DefaultSource
+		return DefaultSource, nil
 	}
 	ix := sort.Search(len(s.as), func(j int) bool {
 		return s.as[j].Starts.Before(i.AcqTime) && s.as[j].Ends.After(i.AcqTime)
 	})
 	if ix < len(s.as) {
-		src := s.as[ix].Type
+		var (
+			act = s.as[ix]
+			src = act.Type
+		)
 		if src == "" {
 			src = DefaultSource
 		}
-		return src
+		ps := make([]Parameter, 0, 3)
+		ps = append(ps, MakeParameter(activityStarts, act.Starts.Format(time.RFC3339)))
+		ps = append(ps, MakeParameter(activityEnds, act.Ends.Format(time.RFC3339)))
+		if act.Comment != "" {
+			ps = append(ps, MakeParameter(activityDesc, act.Comment))
+		}
+		return src, ps
 	}
-	return ""
+	return "", nil
 }
+
+const (
+	activityStarts = "activity.dtstart"
+	activityEnds   = "activity.dtend"
+	activityDesc   = "activity.description"
+)
 
 type Activity struct {
 	Comment string
