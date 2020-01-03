@@ -21,7 +21,10 @@ var (
 	ErrDone = errors.New("done")
 )
 
-const DefaultSource = "Not Provided"
+const (
+	DefaultSource = "Science Run"
+	DefaultModel  = "Flight Model"
+)
 
 type Parameter struct {
 	Name  string `xml:"name"`

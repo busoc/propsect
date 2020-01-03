@@ -56,6 +56,9 @@ func NewBuilder(file, schedule string) (*Builder, error) {
 		levels:    c.Levels,
 		marshaler: m,
 	}
+	if b.data.Model == "" {
+		b.data.Model = DefaultModel
+	}
 	b.schedule, err = loadSchedule(schedule, b.meta.Starts, b.meta.Ends)
 	return &b, err
 }
