@@ -80,11 +80,7 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 	if err == nil {
 		i.AcqTime = s.ModTime().UTC()
 		i.ModTime = s.ModTime().UTC()
-		p := prospect.Parameter{
-			Name:  fileSize,
-			Value: fmt.Sprintf("%d", s.Size()),
-		}
-		i.Parameters = append(i.Parameters, p)
+		i.Parameters = append(i.Parameters, prospect.MakeParameter(fileSize, fmt.Sprintf("%d", s.Size())))
 	}
 	return i, err
 }
