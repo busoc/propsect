@@ -56,7 +56,8 @@ func NewBuilder(file, schedule string) (*Builder, error) {
 		levels:    c.Levels,
 		marshaler: m,
 	}
-	return &b, nil
+	b.schedule, err = loadSchedule(schedule, b.meta.Starts, b.meta.Ends)
+	return &b, err
 }
 
 func (b *Builder) Close() error {

@@ -36,10 +36,11 @@ type Payload struct {
 }
 
 type Schedule struct {
+	source string
 	as []Activity
 }
 
-func loadSchedule(file string) (Schedule, error) {
+func loadSchedule(file string, starts, ends time.Time) (Schedule, error) {
 	if file == "" {
 		return Schedule{}, nil
 	}
@@ -79,7 +80,9 @@ func loadSchedule(file string) (Schedule, error) {
 				return Schedule{}, err
 			}
 			a.Type, a.Comment = row[3], row[4]
-			as = append(as, a)
+			if (a.Starts.Equal(starts) || a.Starts.After(starts)) && (a.Ends.Equal(ends) || a.Ends.Before(ends)) {
+				as = append(as, a)
+			}
 		case io.EOF:
 			sort.Slice(as, func(i, j int) bool {
 				return as[i].Starts.Before(as[j].Starts)
