@@ -9,8 +9,9 @@ import (
 )
 
 func main() {
+	schedule := flag.String("s", "", "schedule")
 	flag.Parse()
-	b, err := prospect.NewBuilder(flag.Arg(0))
+	b, err := prospect.NewBuilder(flag.Arg(0), *schedule)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "configure:", err)
 		os.Exit(1)

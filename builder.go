@@ -18,7 +18,8 @@ type Builder struct {
 	meta    Meta
 	data    Data
 	modules []Config
-	sources []Activity
+
+	schedule Schedule
 
 	dryrun bool
 
@@ -26,7 +27,7 @@ type Builder struct {
 	marshaler
 }
 
-func NewBuilder(file string) (*Builder, error) {
+func NewBuilder(file, schedule string) (*Builder, error) {
 	c := struct {
 		Archive string
 		Dry     bool     `toml:"no-data"`
@@ -34,8 +35,7 @@ func NewBuilder(file string) (*Builder, error) {
 
 		Meta
 		Data    `toml:"dataset"`
-		Plugins []Config   `toml:"module"`
-		Periods []Activity `toml:"period"`
+		Plugins []Config `toml:"module"`
 	}{}
 	if err := toml.DecodeFile(file, &c); err != nil {
 		return nil, err
@@ -53,7 +53,6 @@ func NewBuilder(file string) (*Builder, error) {
 		meta:      c.Meta,
 		data:      c.Data,
 		modules:   c.Plugins,
-		sources:   c.Periods,
 		levels:    c.Levels,
 		marshaler: m,
 	}
@@ -90,8 +89,8 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 	for {
 		switch i, err := mod.Process(); err {
 		case nil:
-			src, keep := b.keepFile(i)
-			if !keep {
+			src := b.schedule.Keep(i)
+			if src == "" {
 				continue
 			}
 
@@ -115,25 +114,6 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 			return fmt.Errorf("%s: %s", mod, err)
 		}
 	}
-}
-
-func (b *Builder) keepFile(i FileInfo) (string, bool) {
-	if len(b.sources) == 0 {
-		return "Local", true
-	}
-	if i.File == "" {
-		return "", false
-	}
-	var src string
-	for _, s := range b.sources {
-		if i.AcqTime.After(s.Starts) && i.AcqTime.Before(s.Ends) {
-			if src = s.Type; src == "" {
-				src = b.data.Source
-			}
-			return src, true
-		}
-	}
-	return "", false
 }
 
 type marshaler interface {

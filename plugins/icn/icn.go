@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	fileSize = "file.size"
-	fileMD5  = "file.md5"
+	fileSize    = "file.size"
+	fileMD5     = "file.md5"
 	fileMMU     = "uplink.target.path"
 	fileUpTime  = "uplink.time.uplink"
 	fileFerTime = "uplink.time.transfer"
@@ -111,7 +111,6 @@ func (m *module) startRecord(row []string) (prospect.FileInfo, error) {
 	switch err {
 	case nil:
 		i.Mime, i.Type = m.cfg.GuessType(filepath.Ext(row[1]))
-		fmt.Println(row[1], i.Mime, i.Type)
 		if i.Mime == "" {
 			i.Mime = prospect.MimePlainDefault
 		}

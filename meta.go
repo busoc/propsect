@@ -1,17 +1,27 @@
 package prospect
 
 import (
+	"encoding/csv"
 	"encoding/xml"
 	"errors"
 	"io"
+	"os"
+	"sort"
 	"strings"
 	"time"
 )
+
+var timePattern = []string{
+	"2006/01/02 15:04:00",
+	"2006-01-02 15:04:00",
+}
 
 var (
 	ErrSkip = errors.New("skip module")
 	ErrDone = errors.New("done")
 )
+
+const DefaultSource = "Not Provided"
 
 type Parameter struct {
 	Name  string `xml:"name"`
@@ -23,6 +33,100 @@ type Payload struct {
 	Accr    string   `toml:"acronym" xml:"-"`
 	Name    string   `xml:"payloadName"`
 	Class   int      `xml:"payloadClass"`
+}
+
+type Schedule struct {
+	as []Activity
+}
+
+func loadSchedule(file string) (Schedule, error) {
+	if file == "" {
+		return Schedule{}, nil
+	}
+
+	r, err := os.Open(file)
+	if err != nil {
+		return Schedule{}, err
+	}
+	defer r.Close()
+
+	stamp := func(dt string) (time.Time, error) {
+		var (
+			err  error
+			when time.Time
+		)
+		for _, f := range timePattern {
+			when, err = time.Parse(f, dt)
+			if err == nil {
+				break
+			}
+		}
+		return when, err
+	}
+
+	var (
+		as = make([]Activity, 0, 100)
+		rs = csv.NewReader(r)
+	)
+	for {
+		switch row, err := rs.Read(); err {
+		case nil:
+			var a Activity
+			if a.Starts, err = stamp(row[0]); err != nil {
+				return Schedule{}, err
+			}
+			if a.Ends, err = stamp(row[1]); err != nil {
+				return Schedule{}, err
+			}
+			a.Type, a.Comment = row[3], row[4]
+			as = append(as, a)
+		case io.EOF:
+			sort.Slice(as, func(i, j int) bool {
+				return as[i].Starts.Before(as[j].Starts)
+			})
+			return Schedule{as: as}, nil
+		default:
+			return Schedule{}, err
+		}
+	}
+}
+
+func (s Schedule) Keep(i FileInfo) string {
+	if i.AcqTime.IsZero() {
+		return ""
+	}
+	if len(s.as) == 0 {
+		return DefaultSource
+	}
+	ix := sort.Search(len(s.as), func(j int) bool {
+		return s.as[j].Starts.Before(i.AcqTime) && s.as[j].Ends.After(i.AcqTime)
+	})
+	if ix < len(s.as) {
+		src := s.as[ix].Type
+		if src == "" {
+			src = DefaultSource
+		}
+		return src
+	}
+	return ""
+}
+
+type Activity struct {
+	Comment string
+	Type    string
+	Starts  time.Time
+	Ends    time.Time
+}
+
+func (a Activity) IsZero() bool {
+	return a.Starts.IsZero() || a.Ends.IsZero()
+}
+
+func (a Activity) Keep(i FileInfo) string {
+	if !i.AcqTime.IsZero() && (a.Starts.Before(i.AcqTime) && a.Ends.After(i.AcqTime)) {
+		return a.Type
+	}
+	return ""
 }
 
 type Meta struct {
@@ -63,13 +167,6 @@ func (m *Meta) MarshalXML(e *xml.Encoder, _ xml.StartElement) error {
 	e.EncodeElement(is, startElement("increments"))
 
 	return nil
-}
-
-type Activity struct {
-	// Name   string
-	Type   string    `toml:"source"`
-	Starts time.Time `toml:"dtstart"`
-	Ends   time.Time `toml:"dtend"`
 }
 
 type Data struct {
