@@ -40,7 +40,7 @@ type Payload struct {
 
 type Schedule struct {
 	source string
-	as []Activity
+	as     []Activity
 }
 
 func loadSchedule(file string, starts, ends time.Time) (Schedule, error) {
