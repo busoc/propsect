@@ -82,7 +82,7 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 	s, err := r.Stat()
 	if err == nil {
 		if m.timefn != nil {
-			i.AcqTime = m.timefn(filepath.Base(file))
+			i.AcqTime = m.timefn(file)
 		} else {
 			i.AcqTime = s.ModTime().UTC()
 		}
