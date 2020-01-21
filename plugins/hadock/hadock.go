@@ -289,10 +289,7 @@ func parseFilename(file string) ([]prospect.Parameter, error) {
 }
 
 func timeFromFile(file string) time.Time {
-	ps := strings.Split(filepath.Base(file), "_")
-
-	when, _ := time.Parse("20060102150405", ps[len(ps)-3]+ps[len(ps)-2])
-	return when
+	return prospect.TimeHadock(file)
 }
 
 func isImage(fcc []byte) bool {
