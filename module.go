@@ -38,6 +38,7 @@ type Config struct {
 	Location  string
 	Type      string
 	Mime      string
+	AcqTime   string
 	Mimes     []Mime `toml:"mimetype"`
 	Path      string
 }
@@ -52,6 +53,20 @@ func (c Config) GuessType(ext string) (string, string) {
 		}
 	}
 	return c.Mime, c.Type
+}
+
+func (c Config) GetTimeFunc() (TimeFunc, error) {
+	var fn TimeFunc
+	switch strings.ToLower(c.AcqTime) {
+	case "hadock":
+		fn = TimeHadock
+	case "rt":
+		fn = TimeRT
+	case "":
+	default:
+		return nil, fmt.Errorf("unsupported acqtime: %s", c.AcqTime)
+	}
+	return fn, nil
 }
 
 func (c Config) Hash() hash.Hash {

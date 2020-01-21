@@ -1,9 +1,18 @@
 package prospect
 
 import (
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
+
+const (
+	HadockTime = "hadock"
+	RTTime     = "rt"
+)
+
+type TimeFunc func(string) time.Time
 
 func TimeRT(file string) time.Time {
 	var (
