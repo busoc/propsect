@@ -41,6 +41,9 @@ type Config struct {
 	AcqTime   string
 	Mimes     []Mime `toml:"mimetype"`
 	Path      string
+
+	// plugin specific configuration file
+	Config    string
 }
 
 func (c Config) GuessType(ext string) (string, string) {
