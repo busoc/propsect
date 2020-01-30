@@ -128,10 +128,11 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 			if err := b.marshalData(x, resolve); err != nil {
 				return err
 			}
-			if !b.dryrun {
-				if err := b.copyFile(x, resolve); err != nil {
-					return err
-				}
+			if b.dryrun {
+				break
+			}
+			if err := b.copyFile(x, resolve); err != nil {
+				return err
 			}
 		case ErrSkip:
 		case ErrDone:

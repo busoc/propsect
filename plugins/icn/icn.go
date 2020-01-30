@@ -15,14 +15,10 @@ import (
 )
 
 const (
-	fileSize    = prospect.FileSize
-	fileMD5     = prospect.FileMD5
 	fileMMU     = "uplink.target.path"
 	fileUpTime  = "uplink.time.uplink"
 	fileFerTime = "uplink.time.transfer"
 	fileRecords = "file.numrec"
-	ptrRef      = prospect.PtrRef
-	ptrRole     = prospect.PtrRole
 
 	uplinkRole = "uplinked file"
 	icnRole    = prospect.TypeUplinkNote
@@ -148,8 +144,8 @@ func (m *module) processRecord(row []string) (prospect.FileInfo, error) {
 	}
 	i.Parameters = []prospect.Parameter{
 		prospect.MakeParameter(fileMMU, row[3]),
-		prospect.MakeParameter(fileMD5, row[10]),
-		prospect.MakeParameter(fileSize, fmt.Sprintf("%d", s.Size())),
+		prospect.MakeParameter(prospect.FileMD5, row[10]),
+		prospect.MakeParameter(prospect.FileSize, fmt.Sprintf("%d", s.Size())),
 	}
 	i.Links = append(i.Links, prospect.Link{File: filepath.Base(row[0]), Role: icnRole})
 
@@ -202,7 +198,7 @@ func (m *module) processListing(file, stamp string) (prospect.FileInfo, error) {
 		return i, err
 	}
 	i.Parameters = []prospect.Parameter{
-		prospect.MakeParameter(fileSize, fmt.Sprintf("%d", size)),
+		prospect.MakeParameter(prospect.FileSize, fmt.Sprintf("%d", size)),
 		prospect.MakeParameter(fileRecords, fmt.Sprintf("%d", len(i.Links))),
 	}
 
