@@ -14,13 +14,13 @@ import (
 )
 
 const (
-	FileSize     = "file.size"
-	FileRecords  = "file.numrec"
-	FileMD5      = "file.md5"
+	FileSize    = "file.size"
+	FileRecords = "file.numrec"
+	FileMD5     = "file.md5"
 	FileDuration = "file.duratino"
 
-	PtrRef  = "ptr.%d.href"
-	PtrRole = "ptr.%d.role"
+	PtrRef      = "ptr.%d.href"
+	PtrRole     = "ptr.%d.role"
 )
 
 type Builder struct {
@@ -113,6 +113,7 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 			i.Parameters = append(i.Parameters, ps...)
 
 			for j, k := range i.Links {
+				// should modify k.File with the final location of linked file in the archive
 				ps := []Parameter{
 					MakeParameter(fmt.Sprintf(PtrRef, j+1), k.File),
 					MakeParameter(fmt.Sprintf(PtrRole, j+1), k.Role),

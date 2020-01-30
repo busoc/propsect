@@ -9,6 +9,7 @@ const (
 	MimeOctetUnformat = "application/octet-stream;access=sequential,form=unformatted"
 
 	MimePlainDefault = "text/plain"
+	MimeCSV          = "text/csv"
 	MimeICN          = "text/plain;access=sequential;form=block-formatted;type=icn"
 )
 
