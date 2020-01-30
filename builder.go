@@ -112,15 +112,18 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 			}
 			i.Parameters = append(i.Parameters, ps...)
 
+			for j, k := range i.Links {
+				ps := []Parameter{
+					MakeParameter(fmt.Sprintf(PtrRef, j+1), k.File),
+					MakeParameter(fmt.Sprintf(PtrRole, j+1), k.Role),
+				}
+				i.Parameters = append(i.Parameters, ps...)
+			}
+
 			x := b.data
 			x.Experiment = b.meta.Name
 			x.Source = src
 			x.Info = i
-
-			for j, k := range i.Links {
-				// fmt.Printf("%d: %s = %+v\n", j, i.File, k)
-				_, _ = j, k
-			}
 
 			if err := b.marshalData(x, resolve); err != nil {
 				return err

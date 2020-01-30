@@ -102,6 +102,7 @@ func (m *module) startList(row []string) (prospect.FileInfo, error) {
 		if i.Type == "" {
 			i.Type = prospect.TypeUplinkNote
 		}
+		i.Integrity = m.cfg.Integrity
 	}
 	return i, err
 }
@@ -146,13 +147,11 @@ func (m *module) processRecord(row []string) (prospect.FileInfo, error) {
 		return i, err
 	}
 	i.Parameters = []prospect.Parameter{
-		prospect.MakeParameter(fmt.Sprintf(ptrRef, 1), row[0]),
-		prospect.MakeParameter(fmt.Sprintf(ptrRole, 1), icnRole),
 		prospect.MakeParameter(fileMMU, row[3]),
 		prospect.MakeParameter(fileMD5, row[10]),
 		prospect.MakeParameter(fileSize, fmt.Sprintf("%d", s.Size())),
 	}
-	i.Links = append(i.Links, prospect.Link{File: row[0], Role: icnRole})
+	i.Links = append(i.Links, prospect.Link{File: filepath.Base(row[0]), Role: icnRole})
 
 	if row[6] != "" || row[6] != "-" {
 		i.AcqTime, _ = time.Parse(timePattern, row[6])
@@ -184,16 +183,15 @@ func (m *module) processListing(file, stamp string) (prospect.FileInfo, error) {
 
 	scan := bufio.NewScanner(io.TeeReader(r, m.digest))
 
-	var (
-		refs []string
-		size int
-	)
+	var size int
 	for scan.Scan() {
 		row := scan.Text()
-		if strings.HasPrefix(row, "Filename:") {
-			refs = append(refs, strings.TrimSpace(strings.TrimPrefix(row, "Filename:")))
-		}
 		size += len(row)
+		if !strings.HasPrefix(row, "Filename:") {
+			continue
+		}
+		row = strings.TrimSpace(strings.TrimPrefix(row, "Filename:"))
+		i.Links = append(i.Links, prospect.Link{File: row, Role: uplinkRole})
 	}
 	if err := scan.Err(); err != nil {
 		return i, err
@@ -205,17 +203,7 @@ func (m *module) processListing(file, stamp string) (prospect.FileInfo, error) {
 	}
 	i.Parameters = []prospect.Parameter{
 		prospect.MakeParameter(fileSize, fmt.Sprintf("%d", size)),
-		prospect.MakeParameter(fileRecords, fmt.Sprintf("%d", len(refs))),
-	}
-
-	for j, r := range refs {
-		ref := fmt.Sprintf(ptrRef, j+1)
-		i.Parameters = append(i.Parameters, prospect.MakeParameter(ref, r))
-
-		rol := fmt.Sprintf(ptrRole, j+1)
-		i.Parameters = append(i.Parameters, prospect.MakeParameter(rol, uplinkRole))
-
-		i.Links = append(i.Links, prospect.Link{File: r, Role: uplinkRole})
+		prospect.MakeParameter(fileRecords, fmt.Sprintf("%d", len(i.Links))),
 	}
 
 	when, err := time.Parse(timePattern, stamp)
