@@ -14,9 +14,6 @@ import (
 )
 
 const (
-	fileDuration = prospect.FileDuration
-	fileRecord   = prospect.FileRecords
-	fileSize     = prospect.FileSize
 	pktCorrupted = "pkt.corrupted"
 )
 
@@ -99,9 +96,9 @@ func (m module) readFile(rs io.Reader) ([]prospect.Parameter, error) {
 	for i := 0; ; i++ {
 		if n, err := rs.Read(m.buf); err != nil {
 			ps := []prospect.Parameter{
-				prospect.MakeParameter(fileDuration, "300s"),
-				prospect.MakeParameter(fileRecord, fmt.Sprintf("%d", i)),
-				prospect.MakeParameter(fileSize, fmt.Sprintf("%d", size)),
+				prospect.MakeParameter(prospect.FileDuration, "300s"),
+				prospect.MakeParameter(prospect.FileRecords, fmt.Sprintf("%d", i)),
+				prospect.MakeParameter(prospect.FileSize, fmt.Sprintf("%d", size)),
 			}
 			if err != io.EOF {
 				ps = append(ps, prospect.MakeParameter(pktCorrupted, fmt.Sprintf("%t", err != io.EOF)))

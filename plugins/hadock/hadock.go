@@ -19,7 +19,6 @@ import (
 )
 
 const (
-	fileSize     = prospect.FileSize
 	fileChannel  = "hpkt.vmu2.hci"
 	fileOid      = "hpkt.vmu2.origin"
 	fileSource   = "hpkt.vmu2.source"
@@ -232,7 +231,7 @@ func readFile(rs io.Reader) ([]prospect.Parameter, error) {
 	n, err := io.Copy(ioutil.Discard, rs)
 	if err == nil {
 		size := int(n) + len(buf)
-		ps = append(ps, prospect.MakeParameter(fileSize, fmt.Sprintf("%d", size)))
+		ps = append(ps, prospect.MakeParameter(prospect.FileSize, fmt.Sprintf("%d", size)))
 	}
 	return ps, nil
 }

@@ -11,10 +11,6 @@ import (
 	"github.com/midbel/glob"
 )
 
-const (
-	fileSize = prospect.FileSize
-)
-
 type module struct {
 	cfg prospect.Config
 
@@ -87,7 +83,9 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 			i.AcqTime = s.ModTime().UTC()
 		}
 		i.ModTime = s.ModTime().UTC()
-		i.Parameters = append(i.Parameters, prospect.MakeParameter(fileSize, fmt.Sprintf("%d", s.Size())))
+
+		p := prospect.MakeParameter(prospect.FileSize, fmt.Sprintf("%d", s.Size()))
+		i.Parameters = append(i.Parameters, p)
 	}
 	return i, err
 }
