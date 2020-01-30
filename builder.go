@@ -107,6 +107,10 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 			x.Source = src
 			x.Info = i
 
+			if len(i.Related) > 0 {
+				// chicken/egg problem
+			}
+
 			if err := b.marshalData(x, resolve); err != nil {
 				return err
 			}

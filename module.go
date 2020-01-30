@@ -25,6 +25,7 @@ type FileInfo struct {
 	AcqTime time.Time
 
 	Parameters []Parameter
+	Related    []string
 }
 
 type Module interface {
