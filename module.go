@@ -25,7 +25,12 @@ type FileInfo struct {
 	AcqTime time.Time
 
 	Parameters []Parameter
-	Related    []string
+	Links      []Link
+}
+
+type Link struct {
+	File string
+	Role string
 }
 
 type Module interface {
@@ -44,7 +49,7 @@ type Config struct {
 	Path      string
 
 	// plugin specific configuration file
-	Config    string
+	Config string
 }
 
 func (c Config) GuessType(ext string) (string, string) {

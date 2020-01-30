@@ -13,6 +13,11 @@ import (
 	"github.com/midbel/toml"
 )
 
+const (
+	ptrRef  = "ptr.%d.href"
+	ptrRole = "ptr.%d.role"
+)
+
 type Builder struct {
 	meta     Meta
 	data     Data
@@ -107,8 +112,9 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 			x.Source = src
 			x.Info = i
 
-			if len(i.Related) > 0 {
-				// chicken/egg problem
+			for j, k := range i.Links {
+				// fmt.Printf("%d: %s = %+v\n", j, i.File, k)
+				_, _ = j, k
 			}
 
 			if err := b.marshalData(x, resolve); err != nil {

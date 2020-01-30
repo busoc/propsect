@@ -152,7 +152,7 @@ func (m *module) processRecord(row []string) (prospect.FileInfo, error) {
 		prospect.MakeParameter(fileMD5, row[10]),
 		prospect.MakeParameter(fileSize, fmt.Sprintf("%d", s.Size())),
 	}
-	i.Related = append(i.Related, row[0])
+	i.Links = append(i.Links, prospect.Link{File: row[0], Role: icnRole})
 
 	if row[6] != "" || row[6] != "-" {
 		i.AcqTime, _ = time.Parse(timePattern, row[6])
@@ -215,7 +215,7 @@ func (m *module) processListing(file, stamp string) (prospect.FileInfo, error) {
 		rol := fmt.Sprintf(ptrRole, j+1)
 		i.Parameters = append(i.Parameters, prospect.MakeParameter(rol, uplinkRole))
 
-		i.Related = append(i.Related, r)
+		i.Links = append(i.Links, prospect.Link{File: r, Role: uplinkRole})
 	}
 
 	when, err := time.Parse(timePattern, stamp)
