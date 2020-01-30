@@ -7,14 +7,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/busoc/prospect"
 	"github.com/midbel/glob"
 )
 
 const (
-	fileHeaders  = "file.headers"
+	fileHeader = "csv.%d.header"
 )
 
 type module struct {
@@ -80,10 +79,14 @@ func (m *module) process(file string) (prospect.FileInfo, error) {
 	if err != nil {
 		return i, err
 	}
+	i.File = file
 	i.Parameters = []prospect.Parameter{
 		prospect.MakeParameter(prospect.FileDuration, "300s"),
 		prospect.MakeParameter(prospect.FileRecords, fmt.Sprintf("%d", records)),
-		prospect.MakeParameter(fileHeaders, strings.Join(headers, " ")),
+	}
+	for j, h := range headers {
+		p := prospect.MakeParameter(fmt.Sprintf(fileHeader, j+1), h)
+		i.Parameters = append(i.Parameters, p)
 	}
 
 	if s, err := r.Stat(); err == nil {
@@ -99,7 +102,7 @@ func (m *module) process(file string) (prospect.FileInfo, error) {
 
 func (m *module) readFile(r io.Reader) ([]string, int, error) {
 	var (
-		rs = csv.NewReader(io.TeeReader(r, m.digest))
+		rs   = csv.NewReader(io.TeeReader(r, m.digest))
 		rows int
 	)
 	hd, err := rs.Read()
