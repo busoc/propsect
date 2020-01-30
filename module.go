@@ -116,3 +116,7 @@ func (c Config) Open() (Module, error) {
 		return nil, fmt.Errorf("%s: invalid plugin - invalid signture (%T)", c.Module, sym)
 	}
 }
+
+func (c Config) resolver() (resolver, error) {
+	return Parse(c.Path)
+}

@@ -3,6 +3,7 @@ package prospect
 import (
 	"archive/zip"
 	"compress/flate"
+	// "encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -10,17 +11,18 @@ import (
 	"strings"
 	"time"
 
+	// "github.com/boltdb/bolt"
 	"github.com/midbel/toml"
 )
 
 const (
-	FileSize    = "file.size"
-	FileRecords = "file.numrec"
-	FileMD5     = "file.md5"
-	FileDuration = "file.duratino"
+	FileSize     = "file.size"
+	FileRecords  = "file.numrec"
+	FileMD5      = "file.md5"
+	FileDuration = "file.duration"
 
-	PtrRef      = "ptr.%d.href"
-	PtrRole     = "ptr.%d.role"
+	PtrRef  = "ptr.%d.href"
+	PtrRole = "ptr.%d.role"
 )
 
 type Builder struct {
@@ -98,9 +100,34 @@ func (b *Builder) Build() error {
 	return b.marshalMeta(b.meta)
 }
 
+var (
+	setInfos = []byte("infos")
+	setFiles = []byte("files")
+)
+
 func (b *Builder) executeModule(mod Module, cfg Config) error {
-	resolve, err := Parse(cfg.Path)
-	if err != nil && cfg.Path != "" {
+	// file := filepath.Join(os.TempDir(), mod.String()+"-cache.db")
+	// db, err := bolt.Open(file, 0644, nil)
+	// if err != nil {
+	// 	return err
+	// }
+	// defer func() {
+	// 	db.Close()
+	// 	os.Remove(file)
+	// }()
+	// db.Update(func(tx *bolt.Tx) error {
+	// 	tx.CreateBucketIfNotExists(setInfos)
+	// 	tx.CreateBucketIfNotExists(setFiles)
+	// 	return nil
+	// })
+	//
+	// if err := b.gatherInfo(db, mod, cfg); err != nil {
+	// 	return err
+	// }
+	// return b.buildArchive(db)
+
+	resolve, err := cfg.resolver()
+	if err != nil {
 		return err
 	}
 	for {
@@ -143,6 +170,92 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 		}
 	}
 }
+
+// func (b *Builder) gatherInfo(db *bolt.DB, mod Module, cfg Config) error {
+// 	resolve, err := cfg.resolver()
+// 	if err != nil {
+// 		return err
+// 	}
+// 	for {
+// 		switch i, err := mod.Process(); err {
+// 		case nil:
+// 			src, ps := b.schedule.Keep(i)
+// 			if src == "" {
+// 				break
+// 			}
+// 			i.Parameters = append(i.Parameters, ps...)
+//
+// 			x := b.data
+// 			x.Experiment = b.meta.Name
+// 			x.Source = src
+// 			x.Info = i
+//
+// 			err := db.Update(func(tx *bolt.Tx) error {
+// 				var (
+// 					key  = []byte(x.Info.File)
+// 					bis  = tx.Bucket(setInfos)
+// 					bfs  = tx.Bucket(setFiles)
+// 					file = resolve.Resolve(x)
+// 				)
+// 				xs, err := json.Marshal(x)
+// 				if err != nil {
+// 					return err
+// 				}
+//
+// 				if err := bis.Put(key, xs); err != nil {
+// 					return err
+// 				}
+//
+// 				return bfs.Put(key, []byte(file))
+// 			})
+// 			if err != nil {
+// 				return err
+// 			}
+// 		case ErrSkip:
+// 		case ErrDone:
+// 			return nil
+// 		default:
+// 			return fmt.Errorf("%s: %s", mod, err)
+// 		}
+// 	}
+// }
+//
+// func (b *Builder) buildArchive(db *bolt.DB) error {
+// 	return db.View(func(tx *bolt.Tx) error {
+// 		var (
+// 			bis = tx.Bucket(setInfos)
+// 			bfs = tx.Bucket(setFiles)
+// 		)
+// 		return bis.ForEach(func(key, value []byte) error {
+// 			var (
+// 				d Data
+// 				j int
+// 			)
+// 			if err := json.Unmarshal(value, &d); err != nil {
+// 				return err
+// 			}
+// 			for _, k := range d.Info.Links {
+// 				file := bfs.Get([]byte(k.File))
+// 				if file == nil {
+// 					continue
+// 				}
+// 				j++
+// 				ps := []Parameter{
+// 					MakeParameter(fmt.Sprintf(PtrRef, j), string(file)),
+// 					MakeParameter(fmt.Sprintf(PtrRole, j), k.Role),
+// 				}
+// 				d.Info.Parameters = append(d.Info.Parameters, ps...)
+// 			}
+// 			if err := b.marshalData(d); err != nil {
+// 				return err
+// 			}
+// 			if b.dryrun {
+// 				return nil
+// 			}
+// 			return b.copyFile(d)
+// 		})
+// 	})
+// }
 
 type marshaler interface {
 	copyFile(Data, resolver) error

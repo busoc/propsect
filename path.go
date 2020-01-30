@@ -9,7 +9,7 @@ import (
 
 func Parse(str string) (resolver, error) {
 	if str == "" {
-		return nil, nil
+		return empty{}, nil
 	}
 	var (
 		rs    []resolver
@@ -87,6 +87,16 @@ func parse(str string) (resolver, error) {
 type resolver interface {
 	Resolve(Data) string
 	fmt.Stringer
+}
+
+type empty struct{}
+
+func (e empty) Resolve(d Data) string {
+	return d.Info.File
+}
+
+func (e empty) String() string {
+	return ""
 }
 
 type path struct {
