@@ -3,7 +3,7 @@ package prospect
 import (
 	"archive/zip"
 	"compress/flate"
-	// "encoding/json"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	// "github.com/boltdb/bolt"
+	"github.com/boltdb/bolt"
 	"github.com/midbel/toml"
 )
 
@@ -31,6 +31,7 @@ type Builder struct {
 	modules  []Config
 	schedule Schedule
 
+	path   string
 	dryrun bool
 
 	marshaler
@@ -59,6 +60,7 @@ func NewBuilder(file, schedule string) (*Builder, error) {
 
 	b := Builder{
 		dryrun:    c.Dry,
+		path:      c.Path,
 		meta:      c.Meta,
 		data:      c.Data,
 		modules:   c.Plugins,
@@ -89,6 +91,10 @@ func (b *Builder) Build() error {
 		if m.Type == "" {
 			m.Type = b.data.Type
 		}
+		if m.Path == "" {
+			m.Path = b.path
+		}
+
 		mod, err := m.Open()
 		if err != nil {
 			return err
@@ -106,26 +112,28 @@ var (
 )
 
 func (b *Builder) executeModule(mod Module, cfg Config) error {
-	// file := filepath.Join(os.TempDir(), mod.String()+"-cache.db")
-	// db, err := bolt.Open(file, 0644, nil)
-	// if err != nil {
-	// 	return err
-	// }
-	// defer func() {
-	// 	db.Close()
-	// 	os.Remove(file)
-	// }()
-	// db.Update(func(tx *bolt.Tx) error {
-	// 	tx.CreateBucketIfNotExists(setInfos)
-	// 	tx.CreateBucketIfNotExists(setFiles)
-	// 	return nil
-	// })
-	//
-	// if err := b.gatherInfo(db, mod, cfg); err != nil {
-	// 	return err
-	// }
-	// return b.buildArchive(db)
+	file := filepath.Join(os.TempDir(), mod.String()+"-cache.db")
+	db, err := bolt.Open(file, 0644, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		db.Close()
+		os.Remove(file)
+	}()
+	db.Update(func(tx *bolt.Tx) error {
+		tx.CreateBucketIfNotExists(setInfos)
+		tx.CreateBucketIfNotExists(setFiles)
+		return nil
+	})
 
+	if err := b.gatherInfo(db, mod, cfg); err != nil {
+		return err
+	}
+	return b.buildArchive(db)
+}
+
+func (b *Builder) gatherInfo(db *bolt.DB, mod Module, cfg Config) error {
 	resolve, err := cfg.resolver()
 	if err != nil {
 		return err
@@ -135,31 +143,34 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 		case nil:
 			src, ps := b.schedule.Keep(i)
 			if src == "" {
-				continue
+				break
 			}
 			i.Parameters = append(i.Parameters, ps...)
-
-			for j, k := range i.Links {
-				// should modify k.File with the final location of linked file in the archive
-				ps := []Parameter{
-					MakeParameter(fmt.Sprintf(PtrRef, j+1), k.File),
-					MakeParameter(fmt.Sprintf(PtrRole, j+1), k.Role),
-				}
-				i.Parameters = append(i.Parameters, ps...)
-			}
 
 			x := b.data
 			x.Experiment = b.meta.Name
 			x.Source = src
 			x.Info = i
 
-			if err := b.marshalData(x, resolve); err != nil {
-				return err
-			}
-			if b.dryrun {
-				break
-			}
-			if err := b.copyFile(x, resolve); err != nil {
+			err := db.Update(func(tx *bolt.Tx) error {
+				var (
+					key  = []byte(x.Info.File)
+					bis  = tx.Bucket(setInfos)
+					bfs  = tx.Bucket(setFiles)
+					file = filepath.Join(x.Rootdir, resolve.Resolve(x), filepath.Base(x.Info.File))
+				)
+				xs, err := json.Marshal(x)
+				if err != nil {
+					return err
+				}
+
+				if err := bis.Put(key, xs); err != nil {
+					return err
+				}
+
+				return bfs.Put(key, []byte(file))
+			})
+			if err != nil {
 				return err
 			}
 		case ErrSkip:
@@ -171,110 +182,57 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 	}
 }
 
-// func (b *Builder) gatherInfo(db *bolt.DB, mod Module, cfg Config) error {
-// 	resolve, err := cfg.resolver()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	for {
-// 		switch i, err := mod.Process(); err {
-// 		case nil:
-// 			src, ps := b.schedule.Keep(i)
-// 			if src == "" {
-// 				break
-// 			}
-// 			i.Parameters = append(i.Parameters, ps...)
-//
-// 			x := b.data
-// 			x.Experiment = b.meta.Name
-// 			x.Source = src
-// 			x.Info = i
-//
-// 			err := db.Update(func(tx *bolt.Tx) error {
-// 				var (
-// 					key  = []byte(x.Info.File)
-// 					bis  = tx.Bucket(setInfos)
-// 					bfs  = tx.Bucket(setFiles)
-// 					file = resolve.Resolve(x)
-// 				)
-// 				xs, err := json.Marshal(x)
-// 				if err != nil {
-// 					return err
-// 				}
-//
-// 				if err := bis.Put(key, xs); err != nil {
-// 					return err
-// 				}
-//
-// 				return bfs.Put(key, []byte(file))
-// 			})
-// 			if err != nil {
-// 				return err
-// 			}
-// 		case ErrSkip:
-// 		case ErrDone:
-// 			return nil
-// 		default:
-// 			return fmt.Errorf("%s: %s", mod, err)
-// 		}
-// 	}
-// }
-//
-// func (b *Builder) buildArchive(db *bolt.DB) error {
-// 	return db.View(func(tx *bolt.Tx) error {
-// 		var (
-// 			bis = tx.Bucket(setInfos)
-// 			bfs = tx.Bucket(setFiles)
-// 		)
-// 		return bis.ForEach(func(key, value []byte) error {
-// 			var (
-// 				d Data
-// 				j int
-// 			)
-// 			if err := json.Unmarshal(value, &d); err != nil {
-// 				return err
-// 			}
-// 			for _, k := range d.Info.Links {
-// 				file := bfs.Get([]byte(k.File))
-// 				if file == nil {
-// 					continue
-// 				}
-// 				j++
-// 				ps := []Parameter{
-// 					MakeParameter(fmt.Sprintf(PtrRef, j), string(file)),
-// 					MakeParameter(fmt.Sprintf(PtrRole, j), k.Role),
-// 				}
-// 				d.Info.Parameters = append(d.Info.Parameters, ps...)
-// 			}
-// 			if err := b.marshalData(d); err != nil {
-// 				return err
-// 			}
-// 			if b.dryrun {
-// 				return nil
-// 			}
-// 			return b.copyFile(d)
-// 		})
-// 	})
-// }
+func (b *Builder) buildArchive(db *bolt.DB) error {
+	return db.View(func(tx *bolt.Tx) error {
+		var (
+			bis = tx.Bucket(setInfos)
+			bfs = tx.Bucket(setFiles)
+		)
+		return bis.ForEach(func(key, value []byte) error {
+			var (
+				d Data
+				j int
+			)
+			if err := json.Unmarshal(value, &d); err != nil {
+				return err
+			}
+			fmt.Println(string(key), d.Info.File)
+			for _, k := range d.Info.Links {
+				file := bfs.Get([]byte(k.File))
+				if file == nil {
+					continue
+				}
+				j++
+				ps := []Parameter{
+					MakeParameter(fmt.Sprintf(PtrRef, j), string(file)),
+					MakeParameter(fmt.Sprintf(PtrRole, j), k.Role),
+				}
+				d.Info.Parameters = append(d.Info.Parameters, ps...)
+			}
+			return nil
+			// if err := b.marshalData(d, nil); err != nil {
+			// 	return err
+			// }
+			// if b.dryrun {
+			// 	return nil
+			// }
+			// return b.copyFile(d, nil)
+		})
+	})
+}
 
 type marshaler interface {
-	copyFile(Data, resolver) error
+	copyFile(Data) error
 
-	marshalData(Data, resolver) error
+	marshalData(Data) error
 	marshalMeta(Meta) error
 }
 
-func newMarshaler(file, path string) (marshaler, error) {
-	r, err := Parse(path)
-	if err != nil {
-		return nil, err
-	}
-
+func newMarshaler(file string) (marshaler, error) {
 	ext := filepath.Ext(file)
 	if i, _ := os.Stat(file); ext == "" || i.IsDir() {
 		f := filebuilder{
-			rootdir:  file,
-			resolver: r,
+			rootdir: file,
 		}
 		return &f, nil
 	}
@@ -285,9 +243,8 @@ func newMarshaler(file, path string) (marshaler, error) {
 	}
 
 	z := zipbuilder{
-		Closer:   w,
-		writer:   zip.NewWriter(w),
-		resolver: r,
+		Closer: w,
+		writer: zip.NewWriter(w),
 	}
 	z.writer.RegisterCompressor(zip.Deflate, func(w io.Writer) (io.WriteCloser, error) {
 		return flate.NewWriter(w, flate.BestCompression)
@@ -297,10 +254,9 @@ func newMarshaler(file, path string) (marshaler, error) {
 
 type filebuilder struct {
 	rootdir string
-	resolver
 }
 
-func (b *filebuilder) copyFile(d Data, rs resolver) error {
+func (b *filebuilder) copyFile(d Data) error {
 	r, err := os.Open(d.Info.File)
 	if err != nil {
 		return err
@@ -322,7 +278,7 @@ func (b *filebuilder) copyFile(d Data, rs resolver) error {
 	return err
 }
 
-func (b *filebuilder) marshalData(d Data, rs resolver) error {
+func (b *filebuilder) marshalData(d Data) error {
 	file := b.prepareFile(d, rs)
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
@@ -385,7 +341,7 @@ func (b *zipbuilder) Close() error {
 	return err
 }
 
-func (b *zipbuilder) copyFile(d Data, rs resolver) error {
+func (b *zipbuilder) copyFile(d Data) error {
 	r, err := os.Open(d.Info.File)
 	if err != nil {
 		return err
@@ -405,7 +361,7 @@ func (b *zipbuilder) copyFile(d Data, rs resolver) error {
 	return err
 }
 
-func (b *zipbuilder) marshalData(d Data, rs resolver) error {
+func (b *zipbuilder) marshalData(d Data) error {
 	file := b.prepareFile(d, rs)
 	fh := zip.FileHeader{
 		Name:     file + ".xml",
