@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	fileSize = "file.size"
+	fileSize = prospect.FileSize
 )
 
 type module struct {

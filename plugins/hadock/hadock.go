@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	fileSize     = "file.size"
+	fileSize     = prospect.FileSize
 	fileChannel  = "hpkt.vmu2.hci"
 	fileOid      = "hpkt.vmu2.origin"
 	fileSource   = "hpkt.vmu2.source"

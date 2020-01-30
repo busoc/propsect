@@ -15,14 +15,14 @@ import (
 )
 
 const (
-	fileSize    = "file.size"
-	fileMD5     = "file.md5"
+	fileSize    = prospect.FileSize
+	fileMD5     = prospect.FileMD5
 	fileMMU     = "uplink.target.path"
 	fileUpTime  = "uplink.time.uplink"
 	fileFerTime = "uplink.time.transfer"
 	fileRecords = "file.numrec"
-	ptrRef      = "ptr.%d.href"
-	ptrRole     = "ptr.%d.role"
+	ptrRef      = prospect.PtrRef
+	ptrRole     = prospect.PtrRole
 
 	uplinkRole = "uplinked file"
 	icnRole    = prospect.TypeUplinkNote

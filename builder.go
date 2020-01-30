@@ -14,8 +14,13 @@ import (
 )
 
 const (
-	ptrRef  = "ptr.%d.href"
-	ptrRole = "ptr.%d.role"
+	FileSize     = "file.size"
+	FileRecords  = "file.numrec"
+	FileMD5      = "file.md5"
+	FileDuration = "file.duratino"
+
+	PtrRef  = "ptr.%d.href"
+	PtrRole = "ptr.%d.role"
 )
 
 type Builder struct {

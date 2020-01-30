@@ -5,9 +5,9 @@ import (
 )
 
 const (
-	fileDuration = "file.duration"
-	fileRecord   = "file.numrec"
-	fileSize     = "file.size"
+	fileDuration = prospect.FileDuration
+	fileRecord   = prospect.FileRecords
+	fileSize     = prospect.FileSize
 	fileHeaders  = "file.headers"
 )
 
