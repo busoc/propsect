@@ -193,7 +193,6 @@ func (b *Builder) buildArchive(db *bolt.DB) error {
 			if err := json.Unmarshal(value, &d); err != nil {
 				return err
 			}
-			// fmt.Println(string(key))
 			for _, k := range d.Info.Links {
 				file := bfs.Get(keyForFile(k.File))
 				if file != nil {
@@ -205,7 +204,6 @@ func (b *Builder) buildArchive(db *bolt.DB) error {
 					MakeParameter(fmt.Sprintf(PtrRole, j), k.Role),
 				}
 				if file == nil {
-					// fmt.Println(">>", k.File, ":", string(keyForFile(k.File)))
 					p := MakeParameter(fmt.Sprintf(PtrPath, j), TypeUnavailable)
 					ps = append(ps, p)
 				}
