@@ -19,6 +19,7 @@ const (
 	TypeUplinkNote   = "inter console note"
 	TypeHighRateData = "high rate data"
 	TypeRawTelemetry = "medium rate telemetry"
+	TypeUnavailable  = "unavailable"
 )
 
 type Mime struct {

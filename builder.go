@@ -53,7 +53,7 @@ func NewBuilder(file, schedule string) (*Builder, error) {
 	if err := os.MkdirAll(filepath.Dir(c.Archive), 0755); err != nil {
 		return nil, err
 	}
-	m, err := newMarshaler(c.Archive, c.Path)
+	m, err := newMarshaler(c.Archive)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (b *Builder) gatherInfo(db *bolt.DB, mod Module, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	for {
+	for seed := 0; ; seed++ {
 		switch i, err := mod.Process(); err {
 		case nil:
 			src, ps := b.schedule.Keep(i)
@@ -154,10 +154,10 @@ func (b *Builder) gatherInfo(db *bolt.DB, mod Module, cfg Config) error {
 
 			err := db.Update(func(tx *bolt.Tx) error {
 				var (
-					key  = []byte(x.Info.File)
+					key  = keyForFile(x.Info.File)
 					bis  = tx.Bucket(setInfos)
 					bfs  = tx.Bucket(setFiles)
-					file = filepath.Join(x.Rootdir, resolve.Resolve(x), filepath.Base(x.Info.File))
+					file = filepath.Join(resolve.Resolve(x), filepath.Base(x.Info.File))
 				)
 				xs, err := json.Marshal(x)
 				if err != nil {
@@ -167,7 +167,6 @@ func (b *Builder) gatherInfo(db *bolt.DB, mod Module, cfg Config) error {
 				if err := bis.Put(key, xs); err != nil {
 					return err
 				}
-
 				return bfs.Put(key, []byte(file))
 			})
 			if err != nil {
@@ -196,33 +195,49 @@ func (b *Builder) buildArchive(db *bolt.DB) error {
 			if err := json.Unmarshal(value, &d); err != nil {
 				return err
 			}
-			fmt.Println(string(key), d.Info.File)
 			for _, k := range d.Info.Links {
-				file := bfs.Get([]byte(k.File))
+				file := bfs.Get(keyForFile(k.File))
 				if file == nil {
-					continue
+					k.Role = TypeUnavailable
+				} else {
+					k.File = string(file)
 				}
 				j++
 				ps := []Parameter{
-					MakeParameter(fmt.Sprintf(PtrRef, j), string(file)),
+					MakeParameter(fmt.Sprintf(PtrRef, j), k.File),
 					MakeParameter(fmt.Sprintf(PtrRole, j), k.Role),
 				}
 				d.Info.Parameters = append(d.Info.Parameters, ps...)
 			}
-			return nil
-			// if err := b.marshalData(d, nil); err != nil {
-			// 	return err
-			// }
-			// if b.dryrun {
-			// 	return nil
-			// }
-			// return b.copyFile(d, nil)
+			original := d.Info.File
+			if file := bfs.Get(key); file != nil {
+				d.Info.File = string(file)
+			}
+			if err := b.marshalData(d); err != nil {
+				return err
+			}
+			if b.dryrun {
+				return nil
+			}
+			return b.copyFile(original, d)
 		})
 	})
 }
 
+func keyForFile(file string) []byte {
+	file = filepath.Base(file)
+	for {
+		e := filepath.Ext(file)
+		if e == "" {
+			break
+		}
+		file = strings.TrimSuffix(file, e)
+	}
+	return []byte(file)
+}
+
 type marshaler interface {
-	copyFile(Data) error
+	copyFile(string, Data) error
 
 	marshalData(Data) error
 	marshalMeta(Meta) error
@@ -256,14 +271,14 @@ type filebuilder struct {
 	rootdir string
 }
 
-func (b *filebuilder) copyFile(d Data) error {
-	r, err := os.Open(d.Info.File)
+func (b *filebuilder) copyFile(file string, d Data) error {
+	r, err := os.Open(file)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
 
-	file := b.prepareFile(d, rs)
+	file = filepath.Join(b.rootdir, d.Info.File)
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
@@ -275,11 +290,12 @@ func (b *filebuilder) copyFile(d Data) error {
 	defer w.Close()
 
 	_, err = io.Copy(w, r)
+	fmt.Println("copying", r.Name(), w.Name(), err)
 	return err
 }
 
 func (b *filebuilder) marshalData(d Data) error {
-	file := b.prepareFile(d, rs)
+	file := filepath.Join(b.rootdir, d.Info.File)
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
@@ -288,14 +304,6 @@ func (b *filebuilder) marshalData(d Data) error {
 		return err
 	}
 	defer w.Close()
-
-	if d.Info.File != file {
-		dir := b.rootdir
-		if !strings.HasSuffix(dir, "/") {
-			dir += "/"
-		}
-		d.Info.File = strings.TrimPrefix(file, dir)
-	}
 
 	return encodeData(w, d)
 }
@@ -313,19 +321,6 @@ func (b *filebuilder) marshalMeta(m Meta) error {
 	return encodeMeta(w, m)
 }
 
-func (b *filebuilder) prepareFile(d Data, r resolver) string {
-	var file string
-	if r == nil {
-		r = b.resolver
-	}
-	if dir := r.Resolve(d); dir != "" {
-		file = filepath.Join(b.rootdir, dir, filepath.Base(d.Info.File))
-	} else {
-		file = filepath.Join(b.rootdir, d.Rootdir, d.Info.File)
-	}
-	return file
-}
-
 type zipbuilder struct {
 	io.Closer
 	writer *zip.Writer
@@ -341,16 +336,15 @@ func (b *zipbuilder) Close() error {
 	return err
 }
 
-func (b *zipbuilder) copyFile(d Data) error {
-	r, err := os.Open(d.Info.File)
+func (b *zipbuilder) copyFile(file string, d Data) error {
+	r, err := os.Open(file)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
 
-	file := b.prepareFile(d, rs)
 	fh := zip.FileHeader{
-		Name:     file,
+		Name:     d.Info.File,
 		Modified: d.Info.AcqTime,
 	}
 	w, err := b.writer.CreateHeader(&fh)
@@ -362,9 +356,8 @@ func (b *zipbuilder) copyFile(d Data) error {
 }
 
 func (b *zipbuilder) marshalData(d Data) error {
-	file := b.prepareFile(d, rs)
 	fh := zip.FileHeader{
-		Name:     file + ".xml",
+		Name:     d.Info.File + ".xml",
 		Modified: d.Info.AcqTime,
 	}
 	w, err := b.writer.CreateHeader(&fh)
@@ -372,9 +365,9 @@ func (b *zipbuilder) marshalData(d Data) error {
 		return err
 	}
 
-	if d.Info.File != file {
-		d.Info.File = file
-	}
+	// if d.Info.File != file {
+	// 	d.Info.File = file
+	// }
 
 	return encodeData(w, d)
 }
@@ -389,17 +382,4 @@ func (b *zipbuilder) marshalMeta(m Meta) error {
 		return err
 	}
 	return encodeMeta(w, m)
-}
-
-func (b *zipbuilder) prepareFile(d Data, r resolver) string {
-	var file string
-	if r == nil {
-		r = b.resolver
-	}
-	if dir := r.Resolve(d); dir != "" {
-		file = filepath.Join(d.Rootdir, dir, filepath.Base(d.Info.File))
-	} else {
-		file = filepath.Join(d.Rootdir, d.Info.File)
-	}
-	return file
 }
