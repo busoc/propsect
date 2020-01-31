@@ -248,6 +248,9 @@ func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
 		Value:  d.Info.Sum,
 	}
 	e.EncodeElement(xs, startElement("integrity"))
+	sort.Slice(d.Info.Parameters, func(i, j int) bool {
+		return d.Info.Parameters[i].Name < d.Info.Parameters[j].Name
+	})
 	ps := struct {
 		Values []Parameter `xml:"parameter"`
 	}{

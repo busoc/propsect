@@ -187,7 +187,11 @@ func (m *module) processListing(file, stamp string) (prospect.FileInfo, error) {
 			continue
 		}
 		row = strings.TrimSpace(strings.TrimPrefix(row, "Filename:"))
-		i.Links = append(i.Links, prospect.Link{File: row, Role: uplinkRole})
+		k := prospect.Link{
+			File: statFile(filepath.Dir(file), row),
+			Role: uplinkRole,
+		}
+		i.Links = append(i.Links, k)
 	}
 	if err := scan.Err(); err != nil {
 		return i, err
@@ -220,4 +224,14 @@ func openFile(file string) (*os.File, error) {
 		return r, nil
 	}
 	return os.Open(file + ".DAT")
+}
+
+func statFile(dir, file string) string {
+	for _, e := range []string{"", ".dat", ".DAT"} {
+		f := file+e
+		if _, err := os.Stat(filepath.Join(dir, f)); err == nil {
+			return f
+		}
+	}
+	return file
 }
