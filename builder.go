@@ -20,6 +20,7 @@ const (
 
 	PtrRef  = "ptr.%d.href"
 	PtrRole = "ptr.%d.role"
+	PtrPath = "ptr.%d.archive"
 )
 
 type Builder struct {
@@ -149,7 +150,7 @@ func (b *Builder) gatherInfo(db *bolt.DB, mod Module, cfg Config) error {
 			x.Source = src
 			x.Info = i
 
-			err := db.Update(func(tx *bolt.Tx) error {
+			err = db.Update(func(tx *bolt.Tx) error {
 				var (
 					key  = keyForFile(x.Info.File)
 					bis  = tx.Bucket(setInfos)
@@ -192,17 +193,21 @@ func (b *Builder) buildArchive(db *bolt.DB) error {
 			if err := json.Unmarshal(value, &d); err != nil {
 				return err
 			}
+			// fmt.Println(string(key))
 			for _, k := range d.Info.Links {
 				file := bfs.Get(keyForFile(k.File))
-				if file == nil {
-					k.Role = TypeUnavailable
-				} else {
+				if file != nil {
 					k.File = string(file)
 				}
 				j++
 				ps := []Parameter{
 					MakeParameter(fmt.Sprintf(PtrRef, j), k.File),
 					MakeParameter(fmt.Sprintf(PtrRole, j), k.Role),
+				}
+				if file == nil {
+					// fmt.Println(">>", k.File, ":", string(keyForFile(k.File)))
+					p := MakeParameter(fmt.Sprintf(PtrPath, j), TypeUnavailable)
+					ps = append(ps, p)
 				}
 				d.Info.Parameters = append(d.Info.Parameters, ps...)
 			}

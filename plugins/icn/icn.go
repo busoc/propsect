@@ -147,7 +147,8 @@ func (m *module) processRecord(row []string) (prospect.FileInfo, error) {
 		prospect.MakeParameter(prospect.FileMD5, row[10]),
 		prospect.MakeParameter(prospect.FileSize, fmt.Sprintf("%d", s.Size())),
 	}
-	i.Links = append(i.Links, prospect.Link{File: filepath.Base(row[0]), Role: icnRole})
+	i.Links = append(i.Links, prospect.Link{File: row[0], Role: icnRole})
+	// i.Links = append(i.Links, prospect.Link{File: filepath.Base(row[0]), Role: icnRole})
 
 	if row[6] != "" || row[6] != "-" {
 		i.AcqTime, _ = time.Parse(timePattern, row[6])
@@ -160,7 +161,7 @@ func (m *module) processRecord(row []string) (prospect.FileInfo, error) {
 
 	i.ModTime = s.ModTime().UTC()
 	i.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
-	i.File = r.Name()
+	i.File = filepath.Join(dir, row[1]) //r.Name()
 
 	return i, nil
 }
