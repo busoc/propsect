@@ -21,7 +21,13 @@ function parseFilename(str) {
 
   match(str, /_[0-9]{2}_[0-9]{3}_[0-9]{2}_[0-9]{2}/)
   info["day"] = "20"substr(str, RSTART+1, 6)
+  info["time"] = substr(str, RSTART+8)
   gsub(/_/, "/", info["day"])
+  gsub(/_/, ":", info["time"])
+
+  if (info["time"] == "") {
+    info["time"] = "17:00"
+  }
 
   info["origin"] = substr(str, 0, RSTART)
   gsub(/^_|_$/, "", info["origin"])
@@ -47,7 +53,7 @@ function dump(i) {
   cksum = data[i]["checksum"]
 
   day = data[i]["day"]
-  uplink = data[i]["uplink"] == "" ? "" : day" "data[i]["uplink"]
+  uplink = data[i]["uplink"] == "" ? day" "data[i]["time"] : day" "data[i]["uplink"]
   transfer = data[i]["transfer"] == "" ? "" : day" "data[i]["transfer"]
 
   flag = data[i]["flag"] == "" ? "-" : "*"
@@ -90,6 +96,7 @@ BEGIN {
   data[file]["sid"] = info["sid"]
   data[file]["origin"] = info["origin"]
   data[file]["day"] = info["day"]
+  data[file]["time"] = info["time"]
 
   command = info["origin"]
   gsub(/_?[vV][0-9]+.*$/, "", command)
