@@ -54,6 +54,7 @@ type Config struct {
 	AcqTime   string
 	Mimes     []Mime `toml:"mimetype"`
 	Path      string
+	Level     int
 
 	// plugin specific configuration file
 	Config string

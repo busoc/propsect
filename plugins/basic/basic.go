@@ -56,6 +56,7 @@ func (m module) Process() (prospect.FileInfo, error) {
 			i.Type = prospect.TypeData
 		}
 		i.Integrity = m.cfg.Integrity
+		i.Level = m.cfg.Level
 	}
 	return i, err
 }
