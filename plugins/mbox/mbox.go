@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"hash"
 	"io"
 	"os"
@@ -110,7 +109,7 @@ func New(cfg prospect.Config) (prospect.Module, error) {
 		datadir: c.Maildir,
 		keep:    c.Keep,
 	}
-	return &m, nil //fmt.Errorf("module not yet fully functional")
+	return &m, nil
 }
 
 func (m *module) String() string {
