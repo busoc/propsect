@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"hash"
 	"io"
 	"os"
@@ -17,17 +18,17 @@ import (
 type filterFunc func(mbox.Message) bool
 
 type attachment struct {
-	Mime string `toml:"content-type"`
-	File string `toml:"filename"`
+	Mime          string `toml:"content-type"`
+	File          string `toml:"filename"`
+	CaseSensitive bool   `toml:"case-sensitive"`
 }
 
 type predicate struct {
-	From    string
-	To      []string
-	Subject string
-	NoReply bool `toml:"no-reply"`
-
-	Attachments []attachment
+	From       string
+	To         []string
+	Subject    string
+	NoReply    bool `toml:"no-reply"`
+	Attachment bool
 
 	Starts time.Time `toml:"dtstart"`
 	Ends   time.Time `toml:"dtend"`
@@ -40,31 +41,10 @@ func (p predicate) filter() filterFunc {
 		withSubject(p.Subject),
 		withReply(p.NoReply),
 		withInterval(p.Starts, p.Ends),
-		withAttachment(p.Attachments),
+		withAttachment(p.Attachment),
 	}
 	return withFilter(fs...)
 }
-
-/*
-maildir    = "/var/mail"
-keep-files = true
-
-parts      = [
-	{content-type = "text/plain", metadata = true},
-	{content-type = "application/pdf", metadata = false},
-	{content-type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", metadata = false},
-]
-
-[[filter]]
-from        = "fsl_ops@busoc.be"
-subject     = "Daily Operations Report for FSL"
-dtstart     = 2018-07-22
-dtend       = 2019-06-19
-attachments = [
-	{conten-type = "application/pdf", filename = "compgran"},
-	{conten-type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename = "compgran"},
-]
-*/
 
 type module struct {
 	cfg prospect.Config
@@ -84,7 +64,7 @@ func New(cfg prospect.Config) (prospect.Module, error) {
 		Keep     bool `toml:"keep-files"`
 		File     string
 		Metadata string
-		Filter   []predicate
+		Filter   []predicate `toml:"message"`
 	}{}
 	if err := toml.DecodeFile(cfg.Config, &c); err != nil {
 		return nil, err
@@ -127,6 +107,7 @@ func (m *module) Process() (prospect.FileInfo, error) {
 	if i, err = m.processMessage(msg); err == nil {
 		i.Integrity = m.cfg.Integrity
 		i.Type = m.cfg.Type
+		i.Level = m.cfg.Level
 		// set i.Mime && i.Type
 	}
 	return i, err
@@ -137,6 +118,8 @@ func (m *module) processMessage(msg mbox.Message) (prospect.FileInfo, error) {
 
 	i.AcqTime = msg.Date()
 	i.ModTime = msg.Date()
+
+	fmt.Println(msg.From(), msg.Date(), msg.Subject())
 
 	return i, prospect.ErrSkip
 }
@@ -213,8 +196,10 @@ func withInterval(starts, ends time.Time) filterFunc {
 	if starts.IsZero() && ends.IsZero() {
 		return keep
 	}
+	starts = starts.UTC()
+	ends = ends.UTC()
 	return func(m mbox.Message) bool {
-		when := m.Date()
+		when := m.Date().UTC()
 		if when.Before(starts) {
 			return false
 		}
@@ -222,37 +207,15 @@ func withInterval(starts, ends time.Time) filterFunc {
 	}
 }
 
-func withAttachment(as []attachment) filterFunc {
-	if len(as) == 0 {
-		return keep
-	}
+func withAttachment(attach bool) filterFunc {
 	const (
 		filename   = "filename"
 		attachment = "attachment"
 	)
 	return func(m mbox.Message) bool {
-		ps := m.Filter(func(hdr mbox.Header) bool {
-			var (
-				ct     = hdr.Get("content-type")
-				df, ps = hdr.Split("content-disposition")
-			)
-			if df != attachment || len(ps) == 0 {
-				return false
-			}
-			for _, a := range as {
-				if a.Mime != "" && !strings.HasPrefix(ct, a.Mime) {
-					continue
-				}
-				if a.File != "" && strings.Contains(ps[filename], a.File) {
-					return true
-				}
-			}
-			return false
-		})
-		return len(ps) > 0
+		return !attach || m.HasAttachments()
 	}
 }
-
 
 func keep(_ mbox.Message) bool {
 	return true

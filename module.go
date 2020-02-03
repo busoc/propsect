@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	LevelZero int  = iota
+	LevelZero int = iota
 	LevelOne
 )
 
