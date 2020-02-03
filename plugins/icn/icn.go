@@ -229,7 +229,7 @@ func openFile(file string) (*os.File, error) {
 
 func statFile(dir, file string) string {
 	for _, e := range []string{"", ".dat", ".DAT"} {
-		f := file+e
+		f := file + e
 		if _, err := os.Stat(filepath.Join(dir, f)); err == nil {
 			return f
 		}
