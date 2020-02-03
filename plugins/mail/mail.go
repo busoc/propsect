@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"hash"
 	"io"
 	"os"
 	"sort"
@@ -45,8 +46,8 @@ func (p predicate) filter() filterFunc {
 }
 
 /*
-maildir    = "/var/mail"
-keep-files = true
+maildir     = "/var/mail"
+keep-files  = true
 
 [[filter]]
 from        = "fsl_ops@busoc.be"
@@ -64,6 +65,7 @@ type module struct {
 
 	reader *bufio.Reader
 	closer io.Closer
+	digest hash.Hash
 
 	datadir string
 	keep    bool
@@ -94,6 +96,7 @@ func New(cfg prospect.Config) (prospect.Module, error) {
 		cfg:     cfg,
 		reader:  bufio.NewReader(r),
 		closer:  r,
+		digest:  cfg.Hash(),
 		filter:  withFilter(fs...),
 		datadir: c.Maildir,
 		keep:    c.Keep,
@@ -109,6 +112,7 @@ func (m *module) Process() (prospect.FileInfo, error) {
 	var (
 		msg mbox.Message
 		err error
+		i   prospect.FileInfo
 	)
 	for {
 		msg, err = mbox.ReadMessage(m.reader)
@@ -117,18 +121,29 @@ func (m *module) Process() (prospect.FileInfo, error) {
 				if !m.keep {
 					os.RemoveAll(m.datadir)
 				}
-				return prospect.FileInfo{}, prospect.ErrDone
+				return i, prospect.ErrDone
 			}
+			return i, err
 		}
 		if m.filter(msg) {
 			break
 		}
 	}
-	return m.processMessage(msg)
+	if i, err = m.processMessage(msg); err == nil {
+		i.Integrity = m.cfg.Integrity
+		i.Type = m.cfg.Type
+		// set i.Mime && i.Type
+	}
+	return i, err
 }
 
 func (m *module) processMessage(msg mbox.Message) (prospect.FileInfo, error) {
-	return prospect.FileInfo{}, prospect.ErrSkip
+	var i prospect.FileInfo
+
+	i.AcqTime = msg.Date()
+	i.ModTime = msg.Date()
+
+	return i, prospect.ErrSkip
 }
 
 func withFilter(funcs ...filterFunc) filterFunc {
