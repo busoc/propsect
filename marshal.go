@@ -19,7 +19,7 @@ type marshaler interface {
 
 func newMarshaler(file string) (marshaler, error) {
 	ext := filepath.Ext(file)
-	if i, _ := os.Stat(file); ext == "" || i.IsDir() {
+	if i, err := os.Stat(file); ext == "" || (err == nil && i.IsDir()) {
 		f := filebuilder{
 			rootdir: file,
 		}
