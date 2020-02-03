@@ -17,7 +17,7 @@ type filterFunc func(mbox.Message) bool
 
 type attachment struct {
 	Mime string `toml:"mimetype"`
-	Name string
+	File string `toml:"filename"`
 }
 
 type predicate struct {
@@ -54,8 +54,8 @@ subject     = "Daily Operations Report for FSL"
 dtstart     = 2018-07-22
 dtend       = 2019-06-19
 attachments = [
-	{mimetype = "application/pdf", name = "compgran"},
-	{mimetype = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", name = "compgran"},
+	{mimetype = "application/pdf", filename = "compgran"},
+	{mimetype = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename = "compgran"},
 ]
 */
 
@@ -96,7 +96,7 @@ func New(cfg prospect.Config) (prospect.Module, error) {
 		closer:  r,
 		filter:  withFilter(fs...),
 		datadir: c.Maildir,
-		keep: c.Keep,
+		keep:    c.Keep,
 	}
 	return &m, nil
 }
@@ -115,7 +115,7 @@ func (m *module) Process() (prospect.FileInfo, error) {
 		if err != nil {
 			if err == io.EOF {
 				if !m.keep {
-					os.RemoveAll(c.datadir)
+					os.RemoveAll(m.datadir)
 				}
 				return prospect.FileInfo{}, prospect.ErrDone
 			}
@@ -127,7 +127,7 @@ func (m *module) Process() (prospect.FileInfo, error) {
 	return m.processMessage(msg)
 }
 
-func (m *module) processMessage(m mbox.Message) (prospect.FileInfo, error) {
+func (m *module) processMessage(msg mbox.Message) (prospect.FileInfo, error) {
 	return prospect.FileInfo{}, prospect.ErrSkip
 }
 
@@ -196,19 +196,25 @@ func withAttachment(as []attachment) filterFunc {
 	if len(as) == 0 {
 		return keep
 	}
+	const (
+		filename   = "filename"
+		attachment = "attachment"
+	)
 	return func(m mbox.Message) bool {
 		ps := m.Filter(func(hdr mbox.Header) bool {
-			if !hdr.Has("content-disposition") {
+			var (
+				ct     = hdr.Get("content-type")
+				df, ps = hdr.Split("content-disposition")
+			)
+			if df != attachment || len(ps) == 0 {
 				return false
 			}
-			var (
-				ct = hdr.Get("content-type")
-				df = hdr.Get("content-disposition")
-			)
-			_ = df
 			for _, a := range as {
 				if a.Mime != "" && !strings.HasPrefix(ct, a.Mime) {
 					continue
+				}
+				if a.File != "" && strings.Contains(ps[filename], a.File) {
+					return true
 				}
 			}
 			return false
