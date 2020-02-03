@@ -233,7 +233,7 @@ func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
 		Values: d.Crews,
 	}
 	e.EncodeElement(cs, startElement("involvedCrew"))
-	e.EncodeElement(d.Level, startElement("processingLevel"))
+	e.EncodeElement(d.Info.Level, startElement("processingLevel"))
 	if d.Info.Type == "" {
 		d.Info.Type = d.Type
 	}

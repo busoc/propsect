@@ -12,6 +12,11 @@ import (
 	"time"
 )
 
+const (
+	LevelZero int  = iota
+	LevelOne
+)
+
 type FileInfo struct {
 	File string
 	Type string
@@ -20,6 +25,8 @@ type FileInfo struct {
 	Integrity string
 	Sum       string
 	Size      int
+
+	Level int
 
 	ModTime time.Time
 	AcqTime time.Time
