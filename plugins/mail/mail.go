@@ -49,6 +49,7 @@ func (p predicate) filter() filterFunc {
 /*
 maildir    = "/var/mail"
 keep-files = true
+
 parts      = [
 	{content-type = "text/plain", metadata = true},
 	{content-type = "application/pdf", metadata = false},
@@ -96,7 +97,7 @@ func New(cfg prospect.Config) (prospect.Module, error) {
 	}
 
 	r, err := os.Open(cfg.Location)
-	if err == nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -109,7 +110,7 @@ func New(cfg prospect.Config) (prospect.Module, error) {
 		datadir: c.Maildir,
 		keep:    c.Keep,
 	}
-	return &m, fmt.Errorf("module not yet fully functional")
+	return &m, nil //fmt.Errorf("module not yet fully functional")
 }
 
 func (m *module) String() string {
