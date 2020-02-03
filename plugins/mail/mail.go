@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"hash"
 	"io"
 	"os"
@@ -17,7 +18,7 @@ import (
 type filterFunc func(mbox.Message) bool
 
 type attachment struct {
-	Mime string `toml:"mimetype"`
+	Mime string `toml:"content-type"`
 	File string `toml:"filename"`
 }
 
@@ -46,8 +47,13 @@ func (p predicate) filter() filterFunc {
 }
 
 /*
-maildir     = "/var/mail"
-keep-files  = true
+maildir    = "/var/mail"
+keep-files = true
+parts      = [
+	{content-type = "text/plain", metadata = true},
+	{content-type = "application/pdf", metadata = false},
+	{content-type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", metadata = false},
+]
 
 [[filter]]
 from        = "fsl_ops@busoc.be"
@@ -55,8 +61,8 @@ subject     = "Daily Operations Report for FSL"
 dtstart     = 2018-07-22
 dtend       = 2019-06-19
 attachments = [
-	{mimetype = "application/pdf", filename = "compgran"},
-	{mimetype = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename = "compgran"},
+	{conten-type = "application/pdf", filename = "compgran"},
+	{conten-type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename = "compgran"},
 ]
 */
 
@@ -74,9 +80,11 @@ type module struct {
 
 func New(cfg prospect.Config) (prospect.Module, error) {
 	c := struct {
-		Maildir string
-		Keep    bool `toml:"keep-files"`
-		Filter  []predicate
+		Maildir  string
+		Keep     bool `toml:"keep-files"`
+		File     string
+		Metadata string
+		Filter   []predicate
 	}{}
 	if err := toml.DecodeFile(cfg.Config, &c); err != nil {
 		return nil, err
@@ -101,7 +109,7 @@ func New(cfg prospect.Config) (prospect.Module, error) {
 		datadir: c.Maildir,
 		keep:    c.Keep,
 	}
-	return &m, nil
+	return &m, fmt.Errorf("module not yet fully functional")
 }
 
 func (m *module) String() string {
@@ -109,26 +117,13 @@ func (m *module) String() string {
 }
 
 func (m *module) Process() (prospect.FileInfo, error) {
-	var (
-		msg mbox.Message
-		err error
-		i   prospect.FileInfo
-	)
-	for {
-		msg, err = mbox.ReadMessage(m.reader)
-		if err != nil {
-			if err == io.EOF {
-				if !m.keep {
-					os.RemoveAll(m.datadir)
-				}
-				return i, prospect.ErrDone
-			}
-			return i, err
-		}
-		if m.filter(msg) {
-			break
-		}
+	var i prospect.FileInfo
+
+	msg, err := m.nextMessage()
+	if err != nil {
+		return i, err
 	}
+
 	if i, err = m.processMessage(msg); err == nil {
 		i.Integrity = m.cfg.Integrity
 		i.Type = m.cfg.Type
@@ -144,6 +139,26 @@ func (m *module) processMessage(msg mbox.Message) (prospect.FileInfo, error) {
 	i.ModTime = msg.Date()
 
 	return i, prospect.ErrSkip
+}
+
+func (m *module) nextMessage() (mbox.Message, error) {
+	var (
+		msg mbox.Message
+		err error
+	)
+	for err == nil {
+		msg, err = mbox.ReadMessage(m.reader)
+		if err == io.EOF {
+			if !m.keep {
+				os.RemoveAll(m.datadir)
+			}
+			err = prospect.ErrDone
+		}
+		if err == nil && m.filter(msg) {
+			break
+		}
+	}
+	return msg, err
 }
 
 func withFilter(funcs ...filterFunc) filterFunc {
@@ -237,6 +252,7 @@ func withAttachment(as []attachment) filterFunc {
 		return len(ps) > 0
 	}
 }
+
 
 func keep(_ mbox.Message) bool {
 	return true
