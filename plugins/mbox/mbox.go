@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"hash"
 	"io"
 	"os"
@@ -16,12 +15,6 @@ import (
 )
 
 type filterFunc func(mbox.Message) bool
-
-type attachment struct {
-	Mime          string `toml:"content-type"`
-	File          string `toml:"filename"`
-	CaseSensitive bool   `toml:"case-sensitive"`
-}
 
 type predicate struct {
 	From       string
@@ -46,6 +39,13 @@ func (p predicate) filter() filterFunc {
 	return withFilter(fs...)
 }
 
+type include struct {
+	Filename  string
+	Sensitive bool `toml:"case-sensitive"`
+	Mimes     []string `toml:"content-type"`
+	Meta      []string `toml:"metadata"`
+}
+
 type module struct {
 	cfg prospect.Config
 
@@ -53,9 +53,22 @@ type module struct {
 	closer io.Closer
 	digest hash.Hash
 
-	datadir string
-	keep    bool
-	filter  filterFunc
+	datadir  string
+	keep     bool
+	filter   filterFunc
+	includes []include
+
+	stack struct{
+		items []item
+		ix    int
+	}
+}
+
+type item struct {
+	File   string
+	Mime   string
+	Digest string
+	When time.Time
 }
 
 func New(cfg prospect.Config) (prospect.Module, error) {
@@ -64,7 +77,8 @@ func New(cfg prospect.Config) (prospect.Module, error) {
 		Keep     bool `toml:"keep-files"`
 		File     string
 		Metadata string
-		Filter   []predicate `toml:"message"`
+		Filter   []predicate
+		Files    []include `toml:"file"`
 	}{}
 	if err := toml.DecodeFile(cfg.Config, &c); err != nil {
 		return nil, err
@@ -97,34 +111,62 @@ func (m *module) String() string {
 }
 
 func (m *module) Process() (prospect.FileInfo, error) {
-	var i prospect.FileInfo
+	var (
+		i prospect.FileInfo
+		err error
+	)
 
-	msg, err := m.nextMessage()
-	if err != nil {
-		return i, err
+	if m.stack.ix >= len(m.stack.items) {
+		if err := m.nextMessage(); err != nil {
+			return i, err
+		}
 	}
-
-	if i, err = m.processMessage(msg); err == nil {
+	if i, err = m.processItem(m.stack.items[m.stack.ix]); err == nil {
 		i.Integrity = m.cfg.Integrity
 		i.Type = m.cfg.Type
 		i.Level = m.cfg.Level
-		// set i.Mime && i.Type
 	}
+	m.stack.ix++
+
 	return i, err
 }
 
-func (m *module) processMessage(msg mbox.Message) (prospect.FileInfo, error) {
-	var i prospect.FileInfo
+func (m *module) processItem(i item) (prospect.FileInfo, error) {
+	var fi prospect.FileInfo
 
-	i.AcqTime = msg.Date()
-	i.ModTime = msg.Date()
+	fi.AcqTime = i.When
+	fi.ModTime = i.When
 
-	fmt.Println(msg.From(), msg.Date(), msg.Subject())
-
-	return i, prospect.ErrSkip
+	for _, j := range m.stack.items {
+		if i.File == i.File {
+			continue
+		}
+		fi.Links = append(fi.Links, prospect.Link{File: j.File})
+	}
+	
+	return fi, prospect.ErrSkip
 }
 
-func (m *module) nextMessage() (mbox.Message, error) {
+func (m *module) processMessage(msg mbox.Message) error {
+	m.stack.ix = 0
+	m.stack.items = m.stack.items[:0]
+
+	ps := msg.Filter(func(hdr mbox.Header) bool {
+		for _, i := range m.includes {
+			_ = i
+		}
+		return false
+	})
+	if len(ps) == 0 {
+		return prospect.ErrSkip
+	}
+	for _, p := range ps {
+		_ = p
+	}
+	return nil
+}
+
+func (m *module) nextMessage() error {
 	var (
 		msg mbox.Message
 		err error
@@ -135,13 +177,17 @@ func (m *module) nextMessage() (mbox.Message, error) {
 			if !m.keep {
 				os.RemoveAll(m.datadir)
 			}
+			m.closer.Close()
 			err = prospect.ErrDone
 		}
 		if err == nil && m.filter(msg) {
 			break
 		}
 	}
-	return msg, err
+	if err == nil {
+		err = m.processMessage(msg)
+	}
+	return err
 }
 
 func withFilter(funcs ...filterFunc) filterFunc {
@@ -208,10 +254,6 @@ func withInterval(starts, ends time.Time) filterFunc {
 }
 
 func withAttachment(attach bool) filterFunc {
-	const (
-		filename   = "filename"
-		attachment = "attachment"
-	)
 	return func(m mbox.Message) bool {
 		return !attach || m.HasAttachments()
 	}
