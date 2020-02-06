@@ -4,13 +4,21 @@ import (
 	"bufio"
 	"hash"
 	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/busoc/prospect"
 	"github.com/midbel/mbox"
 	"github.com/midbel/toml"
+)
+
+const (
+	mailSubject = "mail.subject"
+	mailDesc    = "mail.description"
 )
 
 type filterFunc func(mbox.Message) bool
@@ -26,16 +34,32 @@ type predicate struct {
 	Ends   time.Time `toml:"dtend"`
 }
 
-func (p predicate) filter() filterFunc {
-	fs := []filterFunc{
-		withFrom(p.From),
-		withTo(p.To),
-		withSubject(p.Subject),
-		withReply(p.NoReply),
-		withInterval(p.Starts, p.Ends),
-		withAttachment(p.Attachment),
+type include struct {
+	Types   []string `toml:"content-type"`
+	Pattern string
+}
+
+type part struct {
+	Info prospect.FileInfo
+	Err  error
+}
+
+type handler struct {
+	Type     string
+	Maildir  string
+	Metadata string
+
+	Predicate predicate `toml:"predicate"`
+	Includes  []include `toml:"file"`
+
+	filter filterFunc
+}
+
+func (h *handler) Accept(msg mbox.Message) bool {
+	if h.filter == nil {
+		h.filter = buildFilter(h.Predicate)
 	}
-	return withFilter(fs...)
+	return h.filter(msg)
 }
 
 type module struct {
@@ -45,26 +69,17 @@ type module struct {
 	closer io.Closer
 	digest hash.Hash
 
-	datadir string
-	keep    bool
-	filter  filterFunc
+	handlers []handler
+	queue    <-chan part
 }
 
 func New(cfg prospect.Config) (prospect.Module, error) {
 	c := struct {
-		Maildir  string
-		Keep     bool `toml:"keep-files"`
-		File     string
-		Metadata string
-		Filter   []predicate
+		Keep     bool      `toml:"keep-files"`
+		Handlers []handler `toml:"mail"`
 	}{}
 	if err := toml.DecodeFile(cfg.Config, &c); err != nil {
 		return nil, err
-	}
-
-	fs := make([]filterFunc, len(c.Filter))
-	for i, f := range c.Filter {
-		fs[i] = f.filter()
 	}
 
 	r, err := os.Open(cfg.Location)
@@ -73,15 +88,13 @@ func New(cfg prospect.Config) (prospect.Module, error) {
 	}
 
 	m := module{
-		cfg:     cfg,
-		reader:  bufio.NewReader(r),
-		closer:  r,
-		digest:  cfg.Hash(),
-		filter:  withFilter(fs...),
-		datadir: c.Maildir,
-		keep:    c.Keep,
+		reader:   bufio.NewReader(r),
+		closer:   r,
+		cfg:      cfg,
+		digest:   cfg.Hash(),
+		handlers: c.Handlers,
 	}
-	return &m, nil
+	return &m, m.nextMessage()
 }
 
 func (m *module) String() string {
@@ -89,40 +102,109 @@ func (m *module) String() string {
 }
 
 func (m *module) Process() (prospect.FileInfo, error) {
-	var (
-		i   prospect.FileInfo
-		err error
-	)
-
-	return i, err
-}
-
-func (m *module) processMessage(msg mbox.Message) error {
-	return nil
+	p, ok := <-m.queue
+	if !ok {
+		err := m.nextMessage()
+		if err != nil {
+			return prospect.FileInfo{}, err
+		}
+		return m.Process()
+	}
+	if p.Info.Type == "" {
+		p.Info.Type = m.cfg.Type
+	}
+	return p.Info, p.Err
 }
 
 func (m *module) nextMessage() error {
 	var (
-		msg mbox.Message
-		err error
+		msg  mbox.Message
+		hdl  handler
+		err  error
+		done bool
 	)
-	for err == nil {
+	for !done {
 		msg, err = mbox.ReadMessage(m.reader)
 		if err == io.EOF {
-			if !m.keep {
-				os.RemoveAll(m.datadir)
-			}
 			m.closer.Close()
 			err = prospect.ErrDone
 		}
-		if err == nil && m.filter(msg) {
+		if err != nil {
 			break
+		}
+		for _, hdl = range m.handlers {
+			if done = hdl.Accept(msg); done {
+				break
+			}
 		}
 	}
 	if err == nil {
-		err = m.processMessage(msg)
+		m.queue = m.processMessage(hdl, msg)
 	}
 	return err
+}
+
+func (m *module) processMessage(hdl handler, msg mbox.Message) <-chan part {
+	queue := make(chan part)
+	go func() {
+		defer close(queue)
+		var (
+			p    = msg.Part(hdl.Metadata)
+			meta = p.Text()
+		)
+		for _, i := range hdl.Includes {
+			var (
+				mt string
+				pt mbox.Part
+			)
+			for _, a := range i.Types {
+				pt, mt = msg.Part(a), a
+				if pt.Len() > 0 {
+					break
+				}
+			}
+			if pt.Len() == 0 {
+				continue
+			}
+			match, _ := regexp.MatchString(i.Pattern, pt.Filename())
+			if i.Pattern != "" && !match {
+				continue
+			}
+			file := filepath.Join(hdl.Maildir, pt.Filename())
+			info := prospect.FileInfo{
+				File:    file,
+				Type:    hdl.Type,
+				Mime:    mt,
+				AcqTime: msg.Date(),
+				ModTime: msg.Date(),
+			}
+			info.Parameters = append(info.Parameters, prospect.MakeParameter(mailSubject, msg.Subject()))
+			if len(meta) > 0 {
+				info.Parameters = append(info.Parameters, prospect.MakeParameter(mailDesc, string(meta)))
+			}
+			err := os.MkdirAll(hdl.Maildir, 0755)
+			if err == nil {
+				err = ioutil.WriteFile(file, pt.Bytes(), 0644)
+			}
+			queue <- part{
+				Info: info,
+				Err:  err,
+			}
+		}
+	}()
+	return queue
+}
+
+func buildFilter(p predicate) filterFunc {
+	fs := []filterFunc{
+		withFrom(p.From),
+		withTo(p.To),
+		withSubject(p.Subject),
+		withReply(p.NoReply),
+		withInterval(p.Starts, p.Ends),
+		withAttachment(p.Attachment),
+	}
+	return withFilter(fs...)
 }
 
 func withFilter(funcs ...filterFunc) filterFunc {
