@@ -5,7 +5,6 @@ import (
 	"hash"
 	"io"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -18,7 +17,7 @@ type filterFunc func(mbox.Message) bool
 
 type predicate struct {
 	From       string
-	To         []string
+	To         string
 	Subject    string
 	NoReply    bool `toml:"no-reply"`
 	Attachment bool
@@ -39,13 +38,6 @@ func (p predicate) filter() filterFunc {
 	return withFilter(fs...)
 }
 
-type include struct {
-	Filename  string
-	Sensitive bool `toml:"case-sensitive"`
-	Mimes     []string `toml:"content-type"`
-	Meta      []string `toml:"metadata"`
-}
-
 type module struct {
 	cfg prospect.Config
 
@@ -53,22 +45,9 @@ type module struct {
 	closer io.Closer
 	digest hash.Hash
 
-	datadir  string
-	keep     bool
-	filter   filterFunc
-	includes []include
-
-	stack struct{
-		items []item
-		ix    int
-	}
-}
-
-type item struct {
-	File   string
-	Mime   string
-	Digest string
-	When time.Time
+	datadir string
+	keep    bool
+	filter  filterFunc
 }
 
 func New(cfg prospect.Config) (prospect.Module, error) {
@@ -78,7 +57,6 @@ func New(cfg prospect.Config) (prospect.Module, error) {
 		File     string
 		Metadata string
 		Filter   []predicate
-		Files    []include `toml:"file"`
 	}{}
 	if err := toml.DecodeFile(cfg.Config, &c); err != nil {
 		return nil, err
@@ -112,57 +90,14 @@ func (m *module) String() string {
 
 func (m *module) Process() (prospect.FileInfo, error) {
 	var (
-		i prospect.FileInfo
+		i   prospect.FileInfo
 		err error
 	)
-
-	if m.stack.ix >= len(m.stack.items) {
-		if err := m.nextMessage(); err != nil {
-			return i, err
-		}
-	}
-	if i, err = m.processItem(m.stack.items[m.stack.ix]); err == nil {
-		i.Integrity = m.cfg.Integrity
-		i.Type = m.cfg.Type
-		i.Level = m.cfg.Level
-	}
-	m.stack.ix++
 
 	return i, err
 }
 
-func (m *module) processItem(i item) (prospect.FileInfo, error) {
-	var fi prospect.FileInfo
-
-	fi.AcqTime = i.When
-	fi.ModTime = i.When
-
-	for _, j := range m.stack.items {
-		if i.File == i.File {
-			continue
-		}
-		fi.Links = append(fi.Links, prospect.Link{File: j.File})
-	}
-	
-	return fi, prospect.ErrSkip
-}
-
 func (m *module) processMessage(msg mbox.Message) error {
-	m.stack.ix = 0
-	m.stack.items = m.stack.items[:0]
-
-	ps := msg.Filter(func(hdr mbox.Header) bool {
-		for _, i := range m.includes {
-			_ = i
-		}
-		return false
-	})
-	if len(ps) == 0 {
-		return prospect.ErrSkip
-	}
-	for _, p := range ps {
-		_ = p
-	}
 	return nil
 }
 
@@ -202,20 +137,20 @@ func withFilter(funcs ...filterFunc) filterFunc {
 }
 
 func withFrom(from string) filterFunc {
+	str, accept := cmpStrings(from)
 	return func(m mbox.Message) bool {
-		return from == "" || m.From() == from
+		return accept(m.From(), str)
 	}
 }
 
-func withTo(to []string) filterFunc {
-	if len(to) == 0 {
+func withTo(to string) filterFunc {
+	if to == "" {
 		return keep
 	}
-	sort.Strings(to)
+	str, accept := cmpStrings(to)
 	return func(m mbox.Message) bool {
-		for _, t := range m.To() {
-			i := sort.SearchStrings(to, t)
-			if i < len(to) && to[i] == t {
+		for _, to := range m.To() {
+			if accept(to, str) {
 				return true
 			}
 		}
@@ -224,8 +159,9 @@ func withTo(to []string) filterFunc {
 }
 
 func withSubject(subj string) filterFunc {
+	str, accept := cmpStrings(subj)
 	return func(m mbox.Message) bool {
-		return subj == "" || strings.Contains(m.Subject(), subj)
+		return accept(m.Subject(), str)
 	}
 }
 
@@ -261,4 +197,26 @@ func withAttachment(attach bool) filterFunc {
 
 func keep(_ mbox.Message) bool {
 	return true
+}
+
+func cmpStrings(str string) (string, func(string, string) bool) {
+	if len(str) == 0 {
+		return str, func(_, _ string) bool { return true }
+	}
+	var (
+		not bool
+		cmp func(string, string) bool
+	)
+	if str[0] == '!' {
+		not, str = true, str[1:]
+	}
+	if str[0] == '~' {
+		cmp, str = strings.Contains, str[1:]
+	} else {
+		cmp = func(str1, str2 string) bool { return str1 == str2 }
+	}
+	if not {
+		return str, func(str1, str2 string) bool { return !cmp(str1, str2) }
+	}
+	return str, cmp
 }
