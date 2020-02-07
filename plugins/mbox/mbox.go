@@ -45,6 +45,7 @@ type part struct {
 }
 
 type handler struct {
+	Prefix   string
 	Type     string
 	Maildir  string
 	Metadata string
@@ -148,6 +149,42 @@ func (m *module) nextMessage() error {
 }
 
 func (m *module) processMessage(hdl handler, msg mbox.Message) <-chan part {
+	var (
+		p     = msg.Part(hdl.Metadata)
+		meta  = p.Text()
+		parts []struct {
+			Mime string
+			mbox.Part
+		}
+	)
+	for _, i := range hdl.Includes {
+		var (
+			mt string
+			pt mbox.Part
+		)
+		for _, a := range i.Types {
+			pt, mt = msg.Part(a), a
+			if pt.Len() > 0 {
+				break
+			}
+		}
+		if pt.Len() == 0 {
+			continue
+		}
+		match, _ := regexp.MatchString(i.Pattern, pt.Filename())
+		if i.Pattern != "" && !match {
+			continue
+		}
+		item := struct {
+			Mime string
+			mbox.Part
+		}{
+			Mime: mt,
+			Part: pt,
+		}
+		parts = append(parts, item)
+	}
+
 	queue := make(chan part)
 	go func() {
 		defer func() {
@@ -156,33 +193,16 @@ func (m *module) processMessage(hdl handler, msg mbox.Message) <-chan part {
 				os.RemoveAll(hdl.Maildir)
 			}
 		}()
-		var (
-			p    = msg.Part(hdl.Metadata)
-			meta = p.Text()
-		)
-		for _, i := range hdl.Includes {
-			var (
-				mt string
-				pt mbox.Part
-			)
-			for _, a := range i.Types {
-				pt, mt = msg.Part(a), a
-				if pt.Len() > 0 {
-					break
-				}
+		for _, pt := range parts {
+			file := pt.Filename()
+			if file == "" {
+				file = fmt.Sprintf("%s%s.eml", hdl.Prefix, msg.Date().Format("20060102_150405"))
 			}
-			if pt.Len() == 0 {
-				continue
-			}
-			match, _ := regexp.MatchString(i.Pattern, pt.Filename())
-			if i.Pattern != "" && !match {
-				continue
-			}
-			file := filepath.Join(hdl.Maildir, pt.Filename())
+			file = filepath.Join(hdl.Maildir, file)
 			info := prospect.FileInfo{
 				File:    file,
 				Type:    hdl.Type,
-				Mime:    mt,
+				Mime:    pt.Mime,
 				AcqTime: msg.Date(),
 				ModTime: msg.Date(),
 			}
@@ -190,12 +210,22 @@ func (m *module) processMessage(hdl handler, msg mbox.Message) <-chan part {
 				prospect.MakeParameter(mailSubject, msg.Subject()),
 				prospect.MakeParameter(prospect.FileSize, fmt.Sprintf("%d", pt.Len())),
 			}
+			for _, p := range parts {
+				if p.Filename() == pt.Filename() {
+					continue
+				}
+				k := prospect.Link{
+					File: filepath.Join(hdl.Maildir, p.Filename()),
+					Role: "attachment",
+				}
+				info.Links = append(info.Links, k)
+			}
 			if len(meta) > 0 {
 				info.Parameters = append(info.Parameters, prospect.MakeParameter(mailDesc, string(meta)))
 			}
 			err := os.MkdirAll(hdl.Maildir, 0755)
 			if err == nil {
-				err = m.writeFile(file, pt)
+				err = m.writeFile(file, pt.Part)
 				info.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
 			}
 			queue <- part{
