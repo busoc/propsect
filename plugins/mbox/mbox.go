@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/busoc/prospect"
+	"github.com/midbel/glob"
 	"github.com/midbel/mbox"
 	"github.com/midbel/toml"
 )
@@ -37,6 +38,7 @@ type predicate struct {
 type include struct {
 	Types   []string `toml:"content-type"`
 	Pattern string
+	Role    string
 }
 
 type part struct {
@@ -48,6 +50,7 @@ type item struct {
 	Mime string
 	File string
 	Meta string
+	Role string
 	mbox.Part
 }
 
@@ -105,17 +108,68 @@ func (h *handler) items(msg mbox.Message) []item {
 			File: file,
 			Meta: string(meta),
 			Part: pt,
+			Role: i.Role,
 		}
 		parts = append(parts, j)
 	}
 	return parts
 }
 
+type reader struct {
+	source *glob.Glob
+
+	inner *bufio.Reader
+	closer io.Closer
+}
+
+func readMessages(location string) (*reader, error) {
+	src, err := glob.New(location)
+	if err != nil {
+		return nil, err
+	}
+	r := reader{
+		source: src,
+	}
+	return &r, r.reset()
+}
+
+func (r *reader) nextMessage() (mbox.Message, error) {
+	msg, err := mbox.ReadMessage(r.inner)
+	if err != nil {
+		if err == io.EOF {
+			err = r.reset()
+		}
+		return msg, err
+	}
+	return msg, err
+}
+
+func (r *reader) reset() error {
+	if r.closer != nil {
+		r.closer.Close()
+	}
+	file := r.source.Glob()
+	if file == "" {
+		return io.EOF
+	}
+	f, err := os.Open(file)
+	if err != nil {
+		return err
+	}
+	if r.inner == nil {
+		r.inner = bufio.NewReader(f)
+	} else {
+		r.inner.Reset(f)
+	}
+	return nil
+}
+
 type module struct {
 	cfg prospect.Config
 
-	reader *bufio.Reader
-	closer io.Closer
+	// reader *bufio.Reader
+	// closer io.Closer
+	inner  *reader
 	digest hash.Hash
 
 	keep     bool
@@ -132,14 +186,13 @@ func New(cfg prospect.Config) (prospect.Module, error) {
 		return nil, err
 	}
 
-	r, err := os.Open(cfg.Location)
+	inner, err := readMessages(cfg.Location)
 	if err != nil {
 		return nil, err
 	}
 
 	m := module{
-		reader:   bufio.NewReader(r),
-		closer:   r,
+		inner:    inner,
 		cfg:      cfg,
 		digest:   cfg.Hash(),
 		handlers: c.Handlers,
@@ -176,9 +229,9 @@ func (m *module) nextMessage() error {
 		done bool
 	)
 	for !done {
-		msg, err = mbox.ReadMessage(m.reader)
+		msg, err = m.inner.nextMessage()
+		// msg, err = mbox.ReadMessage(m.reader)
 		if err == io.EOF {
-			m.closer.Close()
 			err = prospect.ErrDone
 		}
 		if err != nil {
@@ -224,7 +277,7 @@ func (m *module) processMessage(hdl handler, msg mbox.Message) <-chan part {
 				}
 				k := prospect.Link{
 					File: filepath.Join(hdl.Maildir, p.File),
-					Role: "attachment",
+					Role: p.Role,
 				}
 				info.Links = append(info.Links, k)
 			}
@@ -305,9 +358,12 @@ func withTo(to string) filterFunc {
 }
 
 func withSubject(subj string) filterFunc {
-	str, accept := cmpStrings(subj)
+	re, err := regexp.Compile(subj)
+	if err != nil {
+		return keep
+	}
 	return func(m mbox.Message) bool {
-		return accept(m.Subject(), str)
+		return re.MatchString(m.Subject())
 	}
 }
 
