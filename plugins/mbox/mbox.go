@@ -2,9 +2,9 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"hash"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -69,6 +69,7 @@ type module struct {
 	closer io.Closer
 	digest hash.Hash
 
+	keep     bool
 	handlers []handler
 	queue    <-chan part
 }
@@ -93,6 +94,7 @@ func New(cfg prospect.Config) (prospect.Module, error) {
 		cfg:      cfg,
 		digest:   cfg.Hash(),
 		handlers: c.Handlers,
+		keep:     c.Keep,
 	}
 	return &m, m.nextMessage()
 }
@@ -113,6 +115,7 @@ func (m *module) Process() (prospect.FileInfo, error) {
 	if p.Info.Type == "" {
 		p.Info.Type = m.cfg.Type
 	}
+	p.Info.Integrity = m.cfg.Integrity
 	return p.Info, p.Err
 }
 
@@ -147,7 +150,12 @@ func (m *module) nextMessage() error {
 func (m *module) processMessage(hdl handler, msg mbox.Message) <-chan part {
 	queue := make(chan part)
 	go func() {
-		defer close(queue)
+		defer func() {
+			close(queue)
+			if !m.keep {
+				os.RemoveAll(hdl.Maildir)
+			}
+		}()
 		var (
 			p    = msg.Part(hdl.Metadata)
 			meta = p.Text()
@@ -178,21 +186,39 @@ func (m *module) processMessage(hdl handler, msg mbox.Message) <-chan part {
 				AcqTime: msg.Date(),
 				ModTime: msg.Date(),
 			}
-			info.Parameters = append(info.Parameters, prospect.MakeParameter(mailSubject, msg.Subject()))
+			info.Parameters = []prospect.Parameter{
+				prospect.MakeParameter(mailSubject, msg.Subject()),
+				prospect.MakeParameter(prospect.FileSize, fmt.Sprintf("%d", pt.Len())),
+			}
 			if len(meta) > 0 {
 				info.Parameters = append(info.Parameters, prospect.MakeParameter(mailDesc, string(meta)))
 			}
 			err := os.MkdirAll(hdl.Maildir, 0755)
 			if err == nil {
-				err = ioutil.WriteFile(file, pt.Bytes(), 0644)
+				err = m.writeFile(file, pt)
+				info.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
 			}
 			queue <- part{
 				Info: info,
 				Err:  err,
 			}
+			m.digest.Reset()
 		}
 	}()
 	return queue
+}
+
+func (m *module) writeFile(file string, p mbox.Part) error {
+
+	w, err := os.Create(file)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+
+	ws := io.MultiWriter(w, m.digest)
+	_, err = ws.Write(p.Bytes())
+	return err
 }
 
 func buildFilter(p predicate) filterFunc {
