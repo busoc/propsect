@@ -44,6 +44,13 @@ type part struct {
 	Err  error
 }
 
+type item struct {
+	Mime string
+	File string
+	Meta string
+	mbox.Part
+}
+
 type handler struct {
 	Prefix   string
 	Type     string
@@ -61,6 +68,47 @@ func (h *handler) Accept(msg mbox.Message) bool {
 		h.filter = buildFilter(h.Predicate)
 	}
 	return h.filter(msg)
+}
+
+func (h *handler) items(msg mbox.Message) []item {
+	var (
+		p     = msg.Part(h.Metadata)
+		meta  = p.Text()
+		parts []item
+	)
+	for _, i := range h.Includes {
+		var (
+			mt string
+			pt mbox.Part
+		)
+		for _, a := range i.Types {
+			pt, mt = msg.Part(a), a
+			if pt.Len() > 0 {
+				break
+			}
+		}
+		if pt.Len() == 0 {
+			continue
+		}
+		match, _ := regexp.MatchString(i.Pattern, pt.Filename())
+		if i.Pattern != "" && !match {
+			continue
+		}
+		file := pt.Filename()
+		if file == "" {
+			file = fmt.Sprintf("%s%s.eml", h.Prefix, msg.Date().Format("20060102_150405"))
+		}
+		file = filepath.Join(h.Maildir, file)
+
+		j := item{
+			Mime: mt,
+			File: file,
+			Meta: string(meta),
+			Part: pt,
+		}
+		parts = append(parts, j)
+	}
+	return parts
 }
 
 type module struct {
@@ -149,51 +197,6 @@ func (m *module) nextMessage() error {
 }
 
 func (m *module) processMessage(hdl handler, msg mbox.Message) <-chan part {
-	var (
-		p     = msg.Part(hdl.Metadata)
-		meta  = p.Text()
-		parts []struct {
-			Mime string
-			File string
-			mbox.Part
-		}
-	)
-	for _, i := range hdl.Includes {
-		var (
-			mt string
-			pt mbox.Part
-		)
-		for _, a := range i.Types {
-			pt, mt = msg.Part(a), a
-			if pt.Len() > 0 {
-				break
-			}
-		}
-		if pt.Len() == 0 {
-			continue
-		}
-		match, _ := regexp.MatchString(i.Pattern, pt.Filename())
-		if i.Pattern != "" && !match {
-			continue
-		}
-		file := pt.Filename()
-		if file == "" {
-			file = fmt.Sprintf("%s%s.eml", hdl.Prefix, msg.Date().Format("20060102_150405"))
-		}
-		file = filepath.Join(hdl.Maildir, file)
-
-		item := struct {
-			Mime string
-			File string
-			mbox.Part
-		}{
-			Mime: mt,
-			File: file,
-			Part: pt,
-		}
-		parts = append(parts, item)
-	}
-
 	queue := make(chan part)
 	go func() {
 		defer func() {
@@ -202,6 +205,7 @@ func (m *module) processMessage(hdl handler, msg mbox.Message) <-chan part {
 				os.RemoveAll(hdl.Maildir)
 			}
 		}()
+		parts := hdl.items(msg)
 		for _, pt := range parts {
 			info := prospect.FileInfo{
 				File:    pt.File,
@@ -224,8 +228,8 @@ func (m *module) processMessage(hdl handler, msg mbox.Message) <-chan part {
 				}
 				info.Links = append(info.Links, k)
 			}
-			if len(meta) > 0 {
-				info.Parameters = append(info.Parameters, prospect.MakeParameter(mailDesc, string(meta)))
+			if len(pt.Meta) > 0 {
+				info.Parameters = append(info.Parameters, prospect.MakeParameter(mailDesc, pt.Meta))
 			}
 			err := os.MkdirAll(hdl.Maildir, 0755)
 			if err == nil {
