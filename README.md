@@ -1,5 +1,30 @@
 # prospect
 
+```
+usage:
+
+$ prospect [-s schedule] config.toml
+```
+
+## schedule
+
+prospect use two configuration files. The main configuration will be described in the next section.
+
+The schedule configuration file is used to give to prospect a list of periods
+during which kind of activities have been performed and which source have been used.
+
+This list of periods should be given in a CSV file. this file should have the following fields (in the given order):
+
+* activity start time (RFC3339 format)
+* activity end time (RFC3339 format)
+* activity type
+* activity comment - should be present even if empty
+
+When a data file match one of the activities found in the schedule, prospect will use the values of a matching activity to add specific metadata to this file.
+
+Moreover, all files that does not belong to any of the activities will be discarded and
+won't be saved into the archive.
+
 ## configuration
 
 the configuration file and its structure of prospect is described in the sections that
@@ -37,12 +62,6 @@ the meta table (and its sub tables) groups all properties that describe the expe
 * level    : processing level of the dataset
 * integrity: [hash algorithm](#Supported hash algorithms) to compute the digest of the data files
 * model    : source having generating the dataset
-
-### period
-
-* dtstart: start date of a period of activity
-* dtend  : end date of a period of activity
-* source : activity performed during this period
 
 ### module
 
