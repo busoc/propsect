@@ -2,16 +2,18 @@
 
 ## configuration
 
-prospect is configured with a configuration file (using the TOML format). This file
-has the following tables (in TOML terminology) and options
+the configuration file and its structure of prospect is described in the sections that
+follow:
 
-### top level table
+### top table
 
-* archive    : directory where data files are metadata files (or zip file) will be created
-* no-data    : tell prospect to only generate the metadata file
-* directories: use the list of properties to generate the final directory tree structure where data files and metadata will be created
+* archive: directory where data files are metadata files (or zip file) will be created
+* no-data: tell prospect to only generate the metadata file
+* path   : [path pattern](#Path generation) used to build the final path of the file in the archive
 
 ### meta
+
+the meta table (and its sub tables) groups all properties that describe the experiment itself. The options are used to generate the MD_EXP_<experiment>.xml file. The only exception is the dtstart, dtend options that can be used in parallel with the schedule option of the command.
 
 * acronym     : name of the experiment
 * experiment  : full name of the experiment
@@ -22,140 +24,60 @@ has the following tables (in TOML terminology) and options
 * coordinators: list of people invovled in the experiments
 * increments  : list of increments (start-end)
 
-### meta.payload
+#### meta.payload
 
 * name   : full name of the payload
 * acronym: acronym of the payload
 * class  : class of the payload
 
 ### dataset
+
 * rootdir  : not used
 * owner    : dataset owner
 * level    : processing level of the dataset
-* integrity: hash algorithm to compute the digest of the data files
+* integrity: [hash algorithm](#Supported hash algorithms) to compute the digest of the data files
 * model    : source having generating the dataset
 
 ### period
+
 * dtstart: start date of a period of activity
 * dtend  : end date of a period of activity
 * source : activity performed during this period
 
 ### module
+
 * module  : path to the plugin/module to be loaded by prospect
 * location: path to data files (can be a pattern, a directory, a file - plugin specific)
 * type    : product type handles by the plugin
 * mime    : file format handles by the plugin
+* path    : [path pattern](#Path generation) used to build the final path of the file in the archive
+* level   : product level
+* config  : plugin specific configuration file
+* acqtime : algorithm to be used to compute the acquisition time of a data file
 
-note: the type and mime option even if set, could be used or not by the plugin.
+notes:
 
-### module.mimetype
+* the type and mime option even if set, can be ignore by the plugin implementation.
+* the level option even if set, can be ignore by the plugin implementation.
+* the config option even if set, can be ignore by the plugin implementation.
+* the acqtime option even if set, can be ignore by the plugin implementation.
+
+#### module.mimetype
+
 * extension: list of extensions (prefixed with a dot)
 * mime     : mime type to be set for the given list of extension
 * type     : product type matching the extension and the mime type
 
+## Enumerations
 
-### sample configuration file (used for compgran)
-
-```
-
-archive = "var/sdc/fsl/compgran"
-no-data = true
-directories = [
-  "model",
-  "source",
-  "mime",
-  "year",
-  "doy",
-  "hour",
-  "minute",
-]
-
-[meta]
-acronym    = "compgran"
-experiment = "Compaction and Sound in Granular Media"
-id         = 9627 # ERASMUS EXPERIMENT ARCHIVE
-
-dtstart    = 2018-07-19T16:36:00Z
-dtend      = 2019-06-18T13:11:00Z
-
-fields       = ["physical sciences", "granular system","soft matter"]
-coordinators = []
-increments = [
-  "55-56",
-  "57-58",
-  "59-60",
-]
-
-  [[meta.payload]]
-  name    = "Fluid Science Laboratory"
-  acronym = "FSL"
-  class   = 1
-
-  [[meta.payload]]
-  name    = "Soft Matter Dynamics"
-  acronym = "SMD"
-  class   = 2
-
-[dataset]
-rootdir   = "compgran"
-owner     = "European Space Agency (ESA)"
-level     = 0
-integrity = "SHA-256"
-model     = "flight model"
-
-# [[period]]
-# dtstart = 2018-07-19T16:36:00Z
-# dtend   = 2019-06-18T13:11:00Z
-# source  = "Science run"
-
-[[module]]
-module   = "lib/prospect/hadock.so"
-location = "var/hadock/data/l0/OPS/images/**/*.*"
-type     = "High Rate Images"
-
-[[module]]
-module   = "lib/prospect/hadock.so"
-location = "var/hadock/data/l0/OPS/sciences/**/*.*"
-type     = "High Rate Sciences"
-
-[[module]]
-module   = "lib/prospect/rt.so"
-location = "var/cdmcs/fsl/hrdl/**/rt_??_??.dat"
-type     = "High Rate Telemetry"
-
-  [[module.mimetype]]
-  extensions = [".dat", ".DAT"]
-  mime       = "application/octet-stream;access=sequential,form=unformatted"
-  type       = "raw telemetry"
-
-[[module]]
-module   = "lib/prospect/icn.so"
-location = "tmp/uplinks.csv"
-type     = ""
-mime     = "text/plain"
-
-  [[module.mimetype]]
-  extensions = [".icn", ".ICN"]
-  mime       = "text/plain;access=sequential;form=block-formatted;type=icn"
-  type       = "Intre-console note"
-
-  [[module.mimetype]]
-  extensions = [".dat", ".DAT"]
-  mime       = "text/plain"
-  type       = "Uploaded file"
-
-```
-
-## enumerations
-
-### model
+### Model
 
 * Flight Model
 * Engineering Model
 * Training Model
 * None
 
-### product types
+### Product types
 
 * High Rate Telemetry
 * Medium Rate Telemetry
@@ -167,7 +89,7 @@ mime     = "text/plain"
 * Documentation
 * Mission Data Base
 
-### data source
+### Data source
 
 * Science Run
 * Engineering Test
@@ -178,7 +100,42 @@ mime     = "text/plain"
 * Baseline Data Collection
 * Undefined
 
-## plugins
+# Supported hash algorithms
+
+prospect can generate the digest for the data files with the following well known
+algorithm:
+
+* MD5
+* SHA-1
+* SHA-256
+* SHA-512
+
+# Path generation
+
+in order to control the final location of files in the archive, prospect uses a
+parameterizable path pattern via the {} notation. The parameters that can be used
+in this pattern will be used to create the final path.
+
+the following properties can be used:
+
+* source
+* model
+* mime
+* format
+* type
+* year
+* doy
+* month
+* day
+* hour
+* minute
+* second
+* timestamp
+
+note that any "propreties" not recognized by prospect will be injected by prospect
+as is in the final path.
+
+## Plugins
 
 ### basic
 
@@ -260,3 +217,5 @@ property to: **text/plain**
 
 if no type is set in the module config, the plugin set the type property to:
 **uplink file**
+
+### mbox
