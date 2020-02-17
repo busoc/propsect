@@ -148,14 +148,14 @@ mime     = "text/plain"
 
 ## enumerations
 
-## model
+### model
 
 * Flight Model
 * Engineering Model
 * Training Model
 * None
 
-# product types
+### product types
 
 * High Rate Telemetry
 * Medium Rate Telemetry
