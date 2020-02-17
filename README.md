@@ -211,6 +211,8 @@ icn plugin set the following experiment specific metadata:
 * uplink.time.uplink
 * uplink.time.transfer
 * uplink.source
+* ptr.%d.href
+* ptr.%d.role
 
 if no mime types are set in the module config or none match, the plugin set the mimetype
 property to: **text/plain**
@@ -218,4 +220,43 @@ property to: **text/plain**
 if no type is set in the module config, the plugin set the type property to:
 **uplink file**
 
+the icn plugin expects having as input file (specified in the location option) a csv file
+with the following fields (in the given order):
+
+* source ICN
+* uplinked file
+* original filename
+* command filename
+* filename used for uplink
+* sid
+* uplink time
+* transfer time
+* warning
+* file size
+* md5
+
+this kind of file can be generated thanks to the script scripts/icn.awk
+
+### csv
+
+the csv plugin set the following experiment specific metadata:
+
+* file.size
+* file.duration
+* file.numrec
+* csv.%d.header
+
+the csv plugin expects that all the rows in the input files contains exactly the same
+number of fields.
+
 ### mbox
+
+currently the mbox plugin is the only one using its own configuration file.
+
+the mbox plugin set the following experiment specific metadata:
+
+* file.size
+* mail.subject
+* mail.description
+* ptr.%d.href
+* ptr.%d.role
