@@ -417,14 +417,22 @@ this table can be repeated with an array of table
 
 ###### mail.predicate
 
+This table configures the filters that will be used by the plugin to keep or discard
+e-mail.
+
 * from: sender of e-mail
 * to: receiver of e-mail
+* no-reply: discard all e-mail that have the header In-Reply-To set
 * subject: regular expression to match with the subject of an e-mail
-* dtstart: e-mail should have been send after given date
-* dtend: e-mail should have been send before given date
-* attachment: e-mail should have at least one attachment
+* dtstart: e-mail should have been send after the given date
+* dtend: e-mail should have been send before the given date
+* attachment: e-mail should have at least one attachment. If set to false e-mail
+  having or not attachments will be kept
 
 ###### mail.file
+
+This table configures which parts of e-mail should be include in the archive.
+Multiple table file can be specified in the mail table (array of table).
 
 * role: set the value of the ptr.%d.role specific experiment metadata
 * pattern: regular expression to match with the filename of an attachment
