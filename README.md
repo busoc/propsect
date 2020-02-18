@@ -184,6 +184,21 @@ be kept as is by prospect to create the final path.
 
 ## Plugins
 
+### Plugin interfaces
+
+Plugins to be loaded by prospect should be written in go and should have the
+following interface:
+
+```go
+func New(Config) Module
+func New(Config) (Module, Error)
+
+type Module interface {
+	Process() (FileInfo, error)
+	fmt.Stringer
+}
+```
+
 ### basic plugin
 
 The basic plugin read its data files as is without trying to perform any kind of
