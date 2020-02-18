@@ -84,7 +84,7 @@ following fields (in the given order):
 * activity type
 * activity comment - should be present even if empty
 
-Note that prospect does not treat the first line as containing any headers.
+Note that prospect does not consider the first line as being header.
 
 When a data file can be linked to one activity, prospect will use the values of
 a matching activity to add specific experiment metadata to this file.
@@ -356,9 +356,15 @@ a path to a CSV file with the following fields (in the given order):
 
 This kind of file can be generated thanks to the script scripts/icn.awk
 
-The icn plugin does not treat the first line as a line containing some headers.
+The icn plugin does not consider the first line as being header.
 
 ### csv plugin
+
+The csv plugin, as its name suggests, process only CSV files. However, it consider
+the fields and records of its files as blackbox. The plugin has only two expectations
+on the format of its files. First, every records in the input files should contain
+exactly the same number of fields. And, second, the first row of each files should
+contain the headers for each column.
 
 The csv plugin set the following experiment specific metadata:
 
@@ -369,12 +375,45 @@ The csv plugin set the following experiment specific metadata:
 | file.numrec | number of records |
 | csv.%d.header | header x of file |
 
-The csv plugin expects that all the rows in the input files contains exactly the same
-number of fields.
+If no mime types are set in the module config or none match, the plugin set the mimetype
+property to **text/csv**
+
+If no type is set in the module config, the plugin set the type property to
+**data**
 
 ### mbox plugin
 
-Currently the mbox plugin is the only one using its own configuration file.
+The mbox plugin extracts its files from e-mails and their attachment found in mbox
+files. Each e-mail are parsed individually and their parts are filtered according
+to the plugin specific configuration file.
+
+#### mbox configuration
+
+##### mail table
+
+this table can be repeated with an array of table
+
+* type: set the product type property for a matching file
+* prefix: add the given prefix to each e-mail when the body should be saved
+* maildir: directory where e-mails or their attachments will be saved before being
+  added to the archive
+* metadata: content-type of a part of an e-mail to be used as specific metadata
+
+###### mail.predicate
+
+* from: sender of e-mail
+* to: receiver of e-mail
+* subject: regular expression to match with the subject of an e-mail
+* dtstart: e-mail should have been send after given date
+* dtend: e-mail should have been send before given date
+* attachment: e-mail should have at least one attachment
+
+###### mail.file
+
+* role: set the value of the ptr.%d.role specific experiment metadata
+* pattern: regular expression to match with the filename of an attachment
+* content-type: list of content-type to match in order of preference. As soon as
+  a match is found, no other part are looking for.
 
 The mbox plugin set the following experiment specific metadata:
 

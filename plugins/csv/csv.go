@@ -54,7 +54,7 @@ func (m *module) Process() (prospect.FileInfo, error) {
 			i.Mime = prospect.MimeCSV
 		}
 		if i.Type == "" {
-			i.Mime = prospect.TypeRawTelemetry
+			i.Mime = prospect.TypeData
 		}
 		i.Integrity = m.cfg.Integrity
 		i.Level = m.cfg.Level
