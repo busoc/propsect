@@ -207,9 +207,9 @@ files:
 * file.size: total size of a file (in bytes)
 
 If no mime types are set in the module config or none match, the plugin set the mimetype
-property to: **application/octet-stream**
+property to **application/octet-stream**
 
-If no type is set in the module config, the plugin set the type property to: **data**
+If no type is set in the module config, the plugin set the type property to **data**
 
 ### rt plugin
 
@@ -236,9 +236,9 @@ The rt plugin set the following experiment specific metadata:
 * file.corrupted: information found in the size header is invalid
 
 If no mime types are set in the module config or none match, the plugin set the mimetype
-property to: **application/octet-stream;access=sequential,form=unformatted**
+property to **application/octet-stream;access=sequential,form=unformatted**
 
-If no type is set in the module config, the plugin set the type property to:
+If no type is set in the module config, the plugin set the type property to
 **medium rate telemetry**
 
 ### hadock plugin
@@ -256,51 +256,49 @@ The hadock plugin set the following experiment specific metadata:
 * hrd.pixels.y
 * hrd.invalid
 
-if no mime types are set in the module config or none match, the plugin set the mimetype
-property to: **application/octet-stream**
+If no mime types are set in the module config or none match, the plugin set the mimetype
+property to **application/octet-stream**
 
-if no type is set in the module config, the plugin set the type property to:
+If no type is set in the module config, the plugin set the type property to
 **high rate data**
 
 ### icn plugin
 
-The icn plugin will be used to create the metadata for the inter-console note and
+The icn plugin is to be used to create the metadata for the inter-console note and
 for the files having been uplinked.
 
 The icn plugin set the following experiment specific metadata for inter-console note:
 
-* file.size
-* file.numrec
-* ptr.%d.href
-* ptr.%d.role (value = uplinked file)
+* file.size: total size of a file
+* file.numrec: number of uplinked files found in the ICN
+* ptr.%d.href: path to data file referenced in the ICN
+* ptr.%d.role: uplinked file
 
 If no mime types are set in the module config or none match, the plugin set the mimetype
-property to: **text/plain;access=sequential;form=block-formatted;type=icn**
+property to **text/plain;access=sequential;form=block-formatted;type=icn**
 
-If no type is set in the module config, the plugin set the type property to:
+If no type is set in the module config, the plugin set the type property to
 **inter-console note**
 
 The icn plugin set the following experiment specific metadata for uplinked files:
 
-* file.size
-* file.md5
-* uplink.file.local
-* uplink.file.uplink
-* uplink.file.mmu
-* uplink.time.uplink
-* uplink.time.transfer
-* uplink.source
-* ptr.%d.href
-* ptr.%d.role (value = inter-console note)
+* file.size: size of a file as given in the ICN
+* file.md5: MD5 checksum of a file as given in the ICN
+* uplink.file.local: local filename
+* uplink.target.path: filename used after uplink
+* uplink.time.uplink: schedule time of uplink as given in the ICN
+* uplink.time.transfer: schedule time of transfer as given in the ICN
+* ptr.%d.href: path to ICN file
+* ptr.%d.role: inter-console note
 
 If no mime types are set in the module config or none match, the plugin set the mimetype
 property to: **text/plain**
 
-If no type is set in the module config, the plugin set the type property to:
+If no type is set in the module config, the plugin set the type property to
 **uplink file**
 
-The icn plugin expects having as input file (specified in the location option) a
-CSV file with the following fields (in the given order):
+The icn plugin expects having as only input file (specified in the location option)
+a path to a CSV file with the following fields (in the given order):
 
 * Source ICN
 * Uplinked file
@@ -316,25 +314,25 @@ CSV file with the following fields (in the given order):
 
 This kind of file can be generated thanks to the script scripts/icn.awk
 
-The ICN plugin does not treat the first line as a line containing some headers.
+The icn plugin does not treat the first line as a line containing some headers.
 
 ### csv plugin
 
-the csv plugin set the following experiment specific metadata:
+The csv plugin set the following experiment specific metadata:
 
 * file.size
 * file.duration
 * file.numrec
 * csv.%d.header
 
-the csv plugin expects that all the rows in the input files contains exactly the same
+The csv plugin expects that all the rows in the input files contains exactly the same
 number of fields.
 
 ### mbox plugin
 
-currently the mbox plugin is the only one using its own configuration file.
+Currently the mbox plugin is the only one using its own configuration file.
 
-the mbox plugin set the following experiment specific metadata:
+The mbox plugin set the following experiment specific metadata:
 
 * file.size
 * mail.subject
