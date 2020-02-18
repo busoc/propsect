@@ -6,37 +6,6 @@ usage:
 $ prospect [-s schedule] config.toml
 ```
 
-## schedule
-
-prospect use two configuration files. The main configuration will be described in
-the next section.
-
-The second configuration file provides to prospect a list of activities that have
-been performed in a given time range. This schedule contains the [kind](#Data-source)
-of activities that have been performed and which [source](#Model) has generated the data.
-
-This list of activities should be given in a CSV file. this file should have the
-following fields (in the given order):
-
-* activity start time (RFC3339 format)
-* activity end time (RFC3339 format)
-* activity type
-* activity comment - should be present even if empty
-
-Note that prospect does not treat the first line as containing any headers.
-
-When a data file can be linked to one activity, prospect will use the values of
-a matching activity to add specific experiment metadata to this file.
-
-| metdata | description |
-| :---    | :---        |
-| activity.dtstart | start time of an activity |
-| activity.dtend | end time of an activity|
-| activity.desc | only if the field comment is not empty |
-
-Moreover, files that can not be linked to any will be discarded by prospect and,
-as consequence, won't be saved into the final archive.
-
 ## configuration
 
 the configuration file and its structure of prospect is described in the sections that
@@ -99,6 +68,35 @@ notes:
 * extension: list of extensions (prefixed with a dot)
 * mime     : mime type to be set for the given list of extension
 * type     : product type matching the extension and the mime type
+
+## schedule
+
+A optional configuration file can also be given to prospect. This second
+configuration file provides to prospect a list of activities that have been
+performed in a given time range. This schedule contains the [kind](#Data-source)
+of activities that have been performed and which [source](#Model) has generated the data.
+
+This list of activities should be given in a CSV file. this file should have the
+following fields (in the given order):
+
+* activity start time (RFC3339 format)
+* activity end time (RFC3339 format)
+* activity type
+* activity comment - should be present even if empty
+
+Note that prospect does not treat the first line as containing any headers.
+
+When a data file can be linked to one activity, prospect will use the values of
+a matching activity to add specific experiment metadata to this file.
+
+| metdata | description |
+| :---    | :---        |
+| activity.dtstart | start time of an activity              |
+| activity.dtend   | end time of an activity                |
+| activity.desc    | only if the field comment is not empty |
+
+Moreover, files that can not be linked to any will be discarded by prospect and,
+as consequence, won't be saved into the final archive.
 
 ## Enumerations
 
@@ -249,12 +247,31 @@ If no type is set in the module config, the plugin set the type property to
 
 ### hadock plugin
 
+The hadock plugin has been implemented to deal specifically with the data files
+avaiable in the archive filled by the Hadock software use in the frame of FSL
+activities.
+
+This plugin can be used either for science data or image data or both. However,
+there is an important difference in the metadata that will be generated between
+science data and image data. Indeed, most of the metadata will be taken from
+the XML files that are created by Hadock when saving images in its archive.
+Because science data don't have this XML files, they won't have as many experiment
+specific metadata than images.
+
+Additional notes:
+
+* this plugin can not be used to process files that have not the file format
+  used by Hadock to store its L0 files.
+* due to how some sources are used by the VMU (MMA, MVIS), it is not possible for
+  the plugin to generate more metadata for these sources. The same limitation
+  already exists for Hadock
+
 The hadock plugin set the following experiment specific metadata:
 
 | metdata | description |
 | :---    | :---        |
 | file.size | total size of a file (in bytes) |
-| hpkt.vmu2.hci | channel identifier |
+| hpkt.vmu2.hci | channel identifier  |
 | hpkt.vmu2.origin | originator identifier |
 | hpkt.vmu2.source | originator identifier |
 | hpkt.vmu2.upi | user provided information |
