@@ -28,9 +28,11 @@ Note that prospect does not treat the first line as containing any headers.
 When a data file can be linked to one activity, prospect will use the values of
 a matching activity to add specific experiment metadata to this file.
 
-* activity.dtstart
-* activity.dtend
-* activity.desc: only if the field comment is not empty
+| metdata | description |
+| :---    | :---        |
+| activity.dtstart | start time of an activity |
+| activity.dtend | end time of an activity|
+| activity.desc | only if the field comment is not empty |
 
 Moreover, files that can not be linked to any will be discarded by prospect and,
 as consequence, won't be saved into the final archive.
