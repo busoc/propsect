@@ -27,7 +27,7 @@ $ prospect [-s schedule] config.toml
 the configuration file and its structure of prospect is described in the sections that
 follow. More information on the TOML format can be found [here](https://github.com/toml-lang/toml)
 
-### default
+### root level
 
 * archive: directory where data files are metadata files (or zip file) will be created
 * no-data: tell prospect to only generate the metadata file
@@ -440,11 +440,9 @@ The mbox plugin extracts its files from e-mails and their attachment found in mb
 files. Each e-mail are parsed individually and their parts are filtered according
 to the plugin specific configuration file.
 
-#### mbox configuration
+#### plugin configuration
 
-##### mail table
-
-this table can be repeated with an array of table
+##### table [[mail]]
 
 * type: set the product type property for a matching file
 * prefix: add the given prefix to each e-mail when the body should be saved
@@ -452,7 +450,7 @@ this table can be repeated with an array of table
   added to the archive
 * metadata: content-type of a part of an e-mail to be used as specific metadata
 
-###### mail.predicate
+###### table [mail.predicate]
 
 This table configures the filters that will be used by the plugin to keep or discard
 e-mail.
@@ -466,10 +464,9 @@ e-mail.
 * attachment: e-mail should have at least one attachment. If set to false e-mail
   having or not attachments will be kept
 
-###### mail.file
+###### table [[mail.file]]
 
 This table configures which parts of e-mail should be include in the archive.
-Multiple table file can be specified in the mail table (array of table).
 
 * role: set the value of the ptr.%d.role specific experiment metadata
 * pattern: regular expression to match with the filename of an attachment
