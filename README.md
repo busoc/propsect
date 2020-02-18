@@ -1,6 +1,22 @@
 # prospect
 
-```
+prospect is used to generate the data archive of the different experiments before
+transferring these archives to SDC.
+
+prospect delegates most of the work to its [plugins](#Plugins) in order to create
+the metadata for each data files to be included in the archive.
+
+Each plugin is written either for a specific (eg: rt, hadock) or a generic (eg:
+csv, basic, mbox) file format. See the section on plugins to have the list of
+of already available [plugins](#Plugins).
+
+Depending on its configuration, propsect will create its archive directly on the
+filesystem or in a zip archive. Moreover, it is possible via special [pattern](#Path-pattern)
+to decide where each individual data files will be stored in the archive.
+
+To execute prospect, the following command can be used:
+
+```sh
 usage:
 
 $ prospect [-s schedule] config.toml
@@ -9,7 +25,7 @@ $ prospect [-s schedule] config.toml
 ## configuration
 
 the configuration file and its structure of prospect is described in the sections that
-follow.
+follow. More information on the TOML format can be found [here](https://github.com/toml-lang/toml)
 
 ### top table
 
