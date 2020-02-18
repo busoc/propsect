@@ -191,6 +191,7 @@ following interface:
 
 ```go
 func New(Config) Module
+
 func New(Config) (Module, Error)
 
 type Module interface {
