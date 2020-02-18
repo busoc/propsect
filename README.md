@@ -119,6 +119,21 @@ notes:
 * Baseline Data Collection
 * Undefined
 
+# Globbing
+
+pattern can be passed to the location option in the module tables. This pattern
+have the following synyax:
+
+* ?: match a single character
+* *: match zero or multiple characters
+* []: match a character in the given set of characters
+* **: match any levels of sub directories
+* !(): negate a matching
+* @(): match alternative
+* ?(): match zero or one time the given pattern
+* +(): match at least one time the given pattern
+* *(): match zero or multiples time the given pattern
+
 # Supported hash algorithms
 
 prospect can generate the digest for the data files with the following well known
