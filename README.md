@@ -22,18 +22,18 @@ usage:
 $ prospect [-s schedule] config.toml
 ```
 
-## configuration
+## Configuration
 
 the configuration file and its structure of prospect is described in the sections that
 follow. More information on the TOML format can be found [here](https://github.com/toml-lang/toml)
 
-### top table
+### default
 
 * archive: directory where data files are metadata files (or zip file) will be created
 * no-data: tell prospect to only generate the metadata file
 * path   : [path pattern](#Path-generation) used to build the final path of data files in the archive
 
-### meta
+### table [meta]
 
 the meta table (and its sub tables) groups all properties that describes the experiment
 itself. The options are used to generate the MD_EXP_<experiment>.xml file.
@@ -47,13 +47,13 @@ itself. The options are used to generate the MD_EXP_<experiment>.xml file.
 * coordinators: list of people invovled in the experiments
 * increments  : list of increments (start-end)
 
-#### meta.payload
+#### table [[meta.payload]]
 
 * name   : full name of the payload
 * acronym: acronym of the payload - not used
 * class  : class of the payload (1, 2, 3)
 
-### dataset
+### table [dataset]
 
 * rootdir  : not used
 * owner    : dataset owner
@@ -61,7 +61,7 @@ itself. The options are used to generate the MD_EXP_<experiment>.xml file.
 * integrity: [hash algorithm](#Supported-hash-algorithms) to be used to compute the checksum of the data files
 * model    : source having generating the dataset
 
-### module
+### [[module]]
 
 * module  : path to the plugin/module to be loaded by prospect
 * location: [path](#Globbing) to data files
@@ -79,7 +79,7 @@ notes:
 * the config option even if set, can be ignored by the plugin implementation.
 * the acqtime option even if set, can be ignored by the plugin implementation.
 
-#### module.mimetype
+#### [[module.mimetype]]
 
 * extension: list of extensions (prefixed with a dot)
 * mime     : mime type to be set for the given list of extension
@@ -116,6 +116,10 @@ as consequence, won't be saved into the final archive.
 
 ## Enumerations
 
+Bellow you will find enumerations for some properties. These list are not exhaustives
+and prospect does not check that the values set for these properties matches
+the values given in the enumerations.
+
 ### Model
 
 * Flight Model
@@ -146,7 +150,7 @@ as consequence, won't be saved into the final archive.
 * Baseline Data Collection
 * Undefined
 
-# Globbing
+## Globbing
 
 pattern can be passed to the location option in the module tables. This pattern
 have the following syntax:
@@ -162,17 +166,23 @@ have the following syntax:
 * +(ab|cd): match at least one time the given pattern
 * *(ab|cd): match zero or multiples time the given pattern
 
-# Supported hash algorithms
+examples:
+```sh
+var/hadock/main/l0/OPS/images/**/*.*!(.xml)
+tmp/mails/dors/**/*.@(txt|pdf|xlsx)
+tmp/mails/FSL-@(DORS|ARS)
+```
 
-prospect can generate the digest for the data files with the following well known
-algorithms:
+## Supported hash algorithms
+
+prospect can generate the checksum of data files with the following algorithms:
 
 * MD5
 * SHA-1
 * SHA-256
 * SHA-512
 
-# Path generation
+## Path generation
 
 In order to control the final location of files in the archive, prospect uses a
 parameterizable path pattern via the {} notation. The parameters used in this
@@ -197,6 +207,17 @@ The following properties can be used:
 Note that any "propreties" not listed above will be injected by prospect as is in
 the final path. Moreover, literal string can be used as part of the path and will
 be kept as is by prospect to create the final path.
+
+examples:
+
+```
+model = Flight Model
+date  = 2020-02-18 15:40:05
+type  = Uplinks
+
+{model}/DORS/{year}/{doy}/ => FlightModel/DORS/2020/049/
+{model}/{type}/ICN/{year}/{month}/{day} => FlightModel/Uplinks/ICN/2020/02/18/
+```
 
 ## Plugins
 
@@ -459,11 +480,11 @@ The mbox plugin set the following experiment specific metadata:
 
 | metdata | description |
 | :---    | :---        |
-|* file.size | total size of a file (in bytes) |
-|* mail.subject | subject of an e-mail |
-|* mail.description | body of an e-mail (if configured) |
-|* ptr.%d.href | pointer to related files |
-|* ptr.%d.role | attachment or e-mail |
+| file.size | total size of a file (in bytes) |
+| mail.subject | subject of an e-mail |
+| mail.description | body of an e-mail (if configured) |
+| ptr.%d.href | pointer to related files |
+| ptr.%d.role | attachment or e-mail |
 
 Note that the product type and mimetype properties are with the values given in
 the configuration file of the plugin.
