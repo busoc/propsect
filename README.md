@@ -4,7 +4,8 @@ prospect is used to generate the data archive of the different experiments befor
 transferring these archives to SDC.
 
 prospect delegates most of the work to its [plugins](#Plugins) in order to create
-the metadata for each data files to be included in the archive.
+the metadata for each data files to be included in the archive. Then, each data
+files are copied by prospect into the archive in their final location.
 
 Each plugin is written either for a specific (eg: rt, hadock) or a generic (eg:
 csv, basic, mbox) file format. See the section on plugins to have the list of
