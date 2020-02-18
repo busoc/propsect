@@ -204,7 +204,9 @@ the files to be processed
 The basic plugin set the following experiment specific metadata to each of its data
 files:
 
-* file.size: total size of a file (in bytes)
+| metdata | description |
+| :---    | :---        |
+| file.size | total size of a file (in bytes) |
 
 If no mime types are set in the module config or none match, the plugin set the mimetype
 property to **application/octet-stream**
@@ -230,10 +232,12 @@ the files to be processed.
 
 The rt plugin set the following experiment specific metadata:
 
-* file.duration (default to 300s)
-* file.numrec: number of raw packets found in a file
-* file.size: total size of a file (in bytes)
-* file.corrupted: information found in the size header is invalid
+| metdata | description |
+| :---    | :---        |
+| file.duration  | 300s |
+| file.numrec    | number of raw packets found in a file |
+| file.size      | total size of a file (in bytes) |
+| file.corrupted | information found in the size header is invalid |
 
 If no mime types are set in the module config or none match, the plugin set the mimetype
 property to **application/octet-stream;access=sequential,form=unformatted**
@@ -245,25 +249,27 @@ If no type is set in the module config, the plugin set the type property to
 
 The hadock plugin set the following experiment specific metadata:
 
-* file.size: total size of a file (in bytes)
-* hpkt.vmu2.hci: channel identifier
-* hpkt.vmu2.origin: originator identifier
-* hpkt.vmu2.source: originator identifier
-* hpkt.vmu2.upi: user provided information
-* hpkt.vmu2.instance: OPS, SIM1 SIM2, TEST
-* hpkt.vmu2.mode: realtime, playback
-* hpkt.vmu2.fmt: image format information
-* hpkt.vmu2.pixels.x: number of pixels in X axis
-* hpkt.vmu2.pixels.y: number of pixels in Y axis
-* hpkt.vmu2.invalid: computed checksum mismatched checksum of packet
-* hpkt.vmu2.roi.xof: region of interest X offset
-* hpkt.vmu2.roi.xsz: region of interest X size
-* hpkt.vmu2.roi.yof: region of interest Y offset
-* hpkt.vmu2.roi.ysz: region of interest Y size
-* hpkt.vmu2.fdrp: frame dropping
-* hpkt.vmu2.scale.xsz: scaling configuration X size
-* hpkt.vmu2.scale.ysz: scaling configuration Y axis
-* hpkt.vmu2.scale.far: force aspect ratio
+| metdata | description |
+| :---    | :---        |
+| file.size | total size of a file (in bytes) |
+| hpkt.vmu2.hci | channel identifier |
+| hpkt.vmu2.origin | originator identifier |
+| hpkt.vmu2.source | originator identifier |
+| hpkt.vmu2.upi | user provided information |
+| hpkt.vmu2.instance | OPS, SIM1 SIM2, TEST |
+| hpkt.vmu2.mode | realtime, playback |
+| hpkt.vmu2.fmt | image format information |
+| hpkt.vmu2.pixels.x | number of pixels in X axis |
+| hpkt.vmu2.pixels.y | number of pixels in Y axis |
+| hpkt.vmu2.invalid | computed checksum mismatched checksum of packet |
+| hpkt.vmu2.roi.xof | region of interest X offset |
+| hpkt.vmu2.roi.xsz | region of interest X size |
+| hpkt.vmu2.roi.yof | region of interest Y offset |
+| hpkt.vmu2.roi.ysz | region of interest Y size |
+| hpkt.vmu2.fdrp | frame dropping |
+| hpkt.vmu2.scale.xsz | scaling configuration X size |
+| hpkt.vmu2.scale.ysz | scaling configuration Y axis |
+| hpkt.vmu2.scale.far | force aspect ratio |
 
 
 Note that the hpkt.vmu2.* metadata are only given when the data file contains
@@ -282,10 +288,12 @@ for the files having been uplinked.
 
 The icn plugin set the following experiment specific metadata for inter-console note:
 
-* file.size: total size of a file
-* file.numrec: number of uplinked files found in the ICN
-* ptr.%d.href: path to data file referenced in the ICN
-* ptr.%d.role: uplinked file
+| metdata | description |
+| :---    | :---        |
+| file.size | total size of a file |
+| file.numrec | number of uplinked files found in the ICN |
+| ptr.%d.href | path to data file referenced in the ICN |
+| ptr.%d.role | uplinked file |
 
 If no mime types are set in the module config or none match, the plugin set the mimetype
 property to **text/plain;access=sequential;form=block-formatted;type=icn**
@@ -295,17 +303,19 @@ If no type is set in the module config, the plugin set the type property to
 
 The icn plugin set the following experiment specific metadata for uplinked files:
 
-* file.size: size of a file as given in the ICN
-* file.md5: MD5 checksum of a file as given in the ICN
-* uplink.file.local: local filename
-* uplink.target.path: filename used after uplink
-* uplink.time.uplink: schedule time of uplink as given in the ICN
-* uplink.time.transfer: schedule time of transfer as given in the ICN
-* ptr.%d.href: path to ICN file
-* ptr.%d.role: inter-console note
+| metdata | description |
+| :---    | :---        |
+| file.size | size of a file as given in the ICN |
+| file.md5 | MD5 checksum of a file as given in the ICN |
+| uplink.file.local | local filename |
+| uplink.target.path | filename used after uplink |
+| uplink.time.uplink | schedule time of uplink as given in the ICN |
+| uplink.time.transfer | schedule time of transfer as given in the ICN |
+| ptr.%d.href | path to ICN file |
+| ptr.%d.role | inter-console note |
 
 If no mime types are set in the module config or none match, the plugin set the mimetype
-property to: **text/plain**
+property to **text/plain**
 
 If no type is set in the module config, the plugin set the type property to
 **uplink file**
@@ -333,10 +343,12 @@ The icn plugin does not treat the first line as a line containing some headers.
 
 The csv plugin set the following experiment specific metadata:
 
-* file.size
-* file.duration
-* file.numrec
-* csv.%d.header
+| metdata | description |
+| :---    | :---        |
+| file.size | total size of a file (in bytes) |
+| file.duration | 300s |
+| file.numrec | number of records |
+| csv.%d.header | header x of file |
 
 The csv plugin expects that all the rows in the input files contains exactly the same
 number of fields.
@@ -347,8 +359,10 @@ Currently the mbox plugin is the only one using its own configuration file.
 
 The mbox plugin set the following experiment specific metadata:
 
-* file.size
-* mail.subject
-* mail.description
-* ptr.%d.href
-* ptr.%d.role
+| metdata | description |
+| :---    | :---        |
+|* file.size | total size of a file (in bytes) |
+|* mail.subject | subject of an e-mail |
+|* mail.description | body of an e-mail (if configured) |
+|* ptr.%d.href | pointer to related files |
+|* ptr.%d.role | attachment or e-mail |
