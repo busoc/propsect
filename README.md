@@ -220,7 +220,7 @@ archive - the so called RT files. These files are used to store:
 * Processed parameters
 * high rate data
 
-These three kind of files are structured in the same way:
+These three kind of files are organized in the same way:
 
 * 4 bytes (little endian encoding) given the length of the packet that follow
 * data packet
@@ -245,16 +245,29 @@ If no type is set in the module config, the plugin set the type property to
 
 The hadock plugin set the following experiment specific metadata:
 
-* file.size
-* hrd.channel
-* hrd.source
-* hrd.upi
-* hrd.instance
-* hrd.mode
-* hrd.fcc
-* hrd.pixels.x
-* hrd.pixels.y
-* hrd.invalid
+* file.size: total size of a file (in bytes)
+* hpkt.vmu2.hci: channel identifier
+* hpkt.vmu2.origin: originator identifier
+* hpkt.vmu2.source: originator identifier
+* hpkt.vmu2.upi: user provided information
+* hpkt.vmu2.instance: OPS, SIM1 SIM2, TEST
+* hpkt.vmu2.mode: realtime, playback
+* hpkt.vmu2.fmt: image format information
+* hpkt.vmu2.pixels.x: number of pixels in X axis
+* hpkt.vmu2.pixels.y: number of pixels in Y axis
+* hpkt.vmu2.invalid: computed checksum mismatched checksum of packet
+* hpkt.vmu2.roi.xof: region of interest X offset
+* hpkt.vmu2.roi.xsz: region of interest X size
+* hpkt.vmu2.roi.yof: region of interest Y offset
+* hpkt.vmu2.roi.ysz: region of interest Y size
+* hpkt.vmu2.fdrp: frame dropping
+* hpkt.vmu2.scale.xsz: scaling configuration X size
+* hpkt.vmu2.scale.ysz: scaling configuration Y axis
+* hpkt.vmu2.scale.far: force aspect ratio
+
+
+Note that the hpkt.vmu2.* metadata are only given when the data file contains
+only data of an image.
 
 If no mime types are set in the module config or none match, the plugin set the mimetype
 property to **application/octet-stream**
