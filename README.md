@@ -424,3 +424,9 @@ The mbox plugin set the following experiment specific metadata:
 |* mail.description | body of an e-mail (if configured) |
 |* ptr.%d.href | pointer to related files |
 |* ptr.%d.role | attachment or e-mail |
+
+Note that the product type and mimetype properties are with the values given in
+the configuration file of the plugin.
+
+If the product type is still empty, then it is the value given in the type option
+of the module that is used or the value is set to **data**.
