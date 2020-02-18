@@ -8,41 +8,52 @@ $ prospect [-s schedule] config.toml
 
 ## schedule
 
-prospect use two configuration files. The main configuration will be described in the next section.
+prospect use two configuration files. The main configuration will be described in
+the next section.
 
-The schedule configuration file is used to give to prospect a list of periods
-during which kind of activities have been performed and which source have been used.
+The second configuration file provides to prospect a list of activities that have
+been performed in a given time range. This schedule contains the [kind](#Data-source)
+of activities that have been performed and which [source](#Model) has generated the data.
 
-This list of periods should be given in a CSV file. this file should have the following fields (in the given order):
+This list of activities should be given in a CSV file. this file should have the
+following fields (in the given order):
 
 * activity start time (RFC3339 format)
 * activity end time (RFC3339 format)
 * activity type
 * activity comment - should be present even if empty
 
-When a data file match one of the activities found in the schedule, prospect will use the values of a matching activity to add specific metadata to this file.
+Note that prospect does not treat the first line as containing any headers.
 
-Moreover, all files that does not belong to any of the activities will be discarded and
-won't be saved into the archive.
+When a data file can be linked to one activity, prospect will use the values of
+a matching activity to add specific experiment metadata to this file.
+
+* activity.dtstart
+* activity.dtend
+* activity.desc: only if the field comment is not empty
+
+Moreover, files that can not be linked to any will be discarded by prospect and,
+as consequence, won't be saved into the final archive.
 
 ## configuration
 
 the configuration file and its structure of prospect is described in the sections that
-follow:
+follow.
 
 ### top table
 
 * archive: directory where data files are metadata files (or zip file) will be created
 * no-data: tell prospect to only generate the metadata file
-* path   : [path pattern](#Path generation) used to build the final path of the file in the archive
+* path   : [path pattern](#Path-generation) used to build the final path of data files in the archive
 
 ### meta
 
-the meta table (and its sub tables) groups all properties that describe the experiment itself. The options are used to generate the MD_EXP_<experiment>.xml file. The only exception is the dtstart, dtend options that can be used in parallel with the schedule option of the command.
+the meta table (and its sub tables) groups all properties that describes the experiment
+itself. The options are used to generate the MD_EXP_<experiment>.xml file.
 
 * acronym     : name of the experiment
 * experiment  : full name of the experiment
-* id          : erasmus experiment ID
+* id          : erasmus experiment ID - not used
 * dtstart     : start date of the experiment
 * dtend       : end date of the experiment
 * fields      : list of research fields
@@ -52,34 +63,34 @@ the meta table (and its sub tables) groups all properties that describe the expe
 #### meta.payload
 
 * name   : full name of the payload
-* acronym: acronym of the payload
-* class  : class of the payload
+* acronym: acronym of the payload - not used
+* class  : class of the payload (1, 2, 3)
 
 ### dataset
 
 * rootdir  : not used
 * owner    : dataset owner
-* level    : processing level of the dataset
-* integrity: [hash algorithm](#Supported hash algorithms) to compute the digest of the data files
+* level    : processing level of the dataset (default to 0)
+* integrity: [hash algorithm](#Supported-hash-algorithms) to be used to compute the checksum of the data files
 * model    : source having generating the dataset
 
 ### module
 
 * module  : path to the plugin/module to be loaded by prospect
-* location: path to data files (can be a pattern, a directory, a file - plugin specific)
-* type    : product type handles by the plugin
-* mime    : file format handles by the plugin
-* path    : [path pattern](#Path generation) used to build the final path of the file in the archive
-* level   : product level
+* location: [path](#Globbing) to data files
+* type    : product type of the data files
+* mime    : file format of the data files
+* path    : [path pattern](#Path-generation) used to build the final path of the file in the archive
+* level   : product level (default: 0)
 * config  : plugin specific configuration file
-* acqtime : algorithm to be used to compute the acquisition time of a data file
+* acqtime : algorithm to be used to compute the acquisition time of data files
 
 notes:
 
-* the type and mime option even if set, can be ignore by the plugin implementation.
-* the level option even if set, can be ignore by the plugin implementation.
-* the config option even if set, can be ignore by the plugin implementation.
-* the acqtime option even if set, can be ignore by the plugin implementation.
+* the type and mime option even if set, can be ignored by the plugin implementation.
+* the level option even if set, can be ignored by the plugin implementation.
+* the config option even if set, can be ignored by the plugin implementation.
+* the acqtime option even if set, can be ignored by the plugin implementation.
 
 #### module.mimetype
 
@@ -122,22 +133,23 @@ notes:
 # Globbing
 
 pattern can be passed to the location option in the module tables. This pattern
-have the following synyax:
+have the following syntax:
 
+* c: match the character literally
 * ?: match a single character
 * *: match zero or multiple characters
-* []: match a character in the given set of characters
+* [a-zA-Z0-9]: match a character in the given set of characters
 * **: match any levels of sub directories
-* !(): negate a matching
-* @(): match alternative
-* ?(): match zero or one time the given pattern
-* +(): match at least one time the given pattern
-* *(): match zero or multiples time the given pattern
+* !(foo|bar): negate a matching
+* @(foo|bar): match alternative
+* ?(ab|cd): match zero or one time the given pattern
+* +(ab|cd): match at least one time the given pattern
+* *(ab|cd): match zero or multiples time the given pattern
 
 # Supported hash algorithms
 
 prospect can generate the digest for the data files with the following well known
-algorithm:
+algorithms:
 
 * MD5
 * SHA-1
@@ -146,11 +158,11 @@ algorithm:
 
 # Path generation
 
-in order to control the final location of files in the archive, prospect uses a
-parameterizable path pattern via the {} notation. The parameters that can be used
-in this pattern will be used to create the final path.
+In order to control the final location of files in the archive, prospect uses a
+parameterizable path pattern via the {} notation. The parameters used in this
+pattern will be used to create the final path.
 
-the following properties can be used:
+The following properties can be used:
 
 * source
 * model
@@ -166,40 +178,72 @@ the following properties can be used:
 * second
 * timestamp
 
-note that any "propreties" not recognized by prospect will be injected by prospect
-as is in the final path.
+Note that any "propreties" not listed above will be injected by prospect as is in
+the final path. Moreover, literal string can be used as part of the path and will
+be kept as is by prospect to create the final path.
 
 ## Plugins
 
-### basic
+### basic plugin
 
-basic plugin set the following experiment specific metadata:
+The basic plugin read its data files as is without trying to perform any kind of
+logic on the data found in the files (hence its name).
 
-* file.size
+It can be used for any kind of files like:
 
-if no mime types are set in the module config or none match, the plugin set the mimetype
+* images (png/jpg)
+* text files (xml, json, csv)
+* and many others
+
+The basic plugin is recommended when the data format in a file is unknown or when
+we consider the file to be processed as a black box.
+
+This plugin expect having its location option set to a [pattern](#Globbing) to find
+the files to be processed
+
+The basic plugin set the following experiment specific metadata to each of its data
+files:
+
+* file.size: total size of a file (in bytes)
+
+If no mime types are set in the module config or none match, the plugin set the mimetype
 property to: **application/octet-stream**
 
-if no type is set in the module config, the plugin set the type property to: **data**
+If no type is set in the module config, the plugin set the type property to: **data**
 
-### rt
+### rt plugin
 
-rt plugin set the following experiment specific metadata:
+The rt plugin has been specifically designed to process files found in the HRDP
+archive - the so called RT files. These files are used to store:
 
-* file.duration
-* file.numrec
-* file.size
-* file.corrupted
+* Medium rate telemetry (path telemetry)
+* Processed parameters
+* high rate data
 
-if no mime types are set in the module config or none match, the plugin set the mimetype
+These three kind of files are structured in the same way:
+
+* 4 bytes (little endian encoding) given the length of the packet that follow
+* data packet
+
+This plugin expect having its location option set to a [pattern](#Globbing) to find
+the files to be processed.
+
+The rt plugin set the following experiment specific metadata:
+
+* file.duration (default to 300s)
+* file.numrec: number of raw packets found in a file
+* file.size: total size of a file (in bytes)
+* file.corrupted: information found in the size header is invalid
+
+If no mime types are set in the module config or none match, the plugin set the mimetype
 property to: **application/octet-stream;access=sequential,form=unformatted**
 
-if no type is set in the module config, the plugin set the type property to:
+If no type is set in the module config, the plugin set the type property to:
 **medium rate telemetry**
 
-### hadock
+### hadock plugin
 
-hadock plugin set the following experiment specific metadata:
+The hadock plugin set the following experiment specific metadata:
 
 * file.size
 * hrd.channel
@@ -218,24 +262,25 @@ property to: **application/octet-stream**
 if no type is set in the module config, the plugin set the type property to:
 **high rate data**
 
-### icn - intre-console note
+### icn plugin
 
-icn plugin set the following experiment specific metadata:
+The icn plugin will be used to create the metadata for the inter-console note and
+for the files having been uplinked.
+
+The icn plugin set the following experiment specific metadata for inter-console note:
 
 * file.size
 * file.numrec
 * ptr.%d.href
-* ptr.%d.role
+* ptr.%d.role (value = uplinked file)
 
-if no mime types are set in the module config or none match, the plugin set the mimetype
+If no mime types are set in the module config or none match, the plugin set the mimetype
 property to: **text/plain;access=sequential;form=block-formatted;type=icn**
 
-if no type is set in the module config, the plugin set the type property to:
-**intre-console note**
+If no type is set in the module config, the plugin set the type property to:
+**inter-console note**
 
-### icn - uplinked file
-
-icn plugin set the following experiment specific metadata:
+The icn plugin set the following experiment specific metadata for uplinked files:
 
 * file.size
 * file.md5
@@ -246,32 +291,34 @@ icn plugin set the following experiment specific metadata:
 * uplink.time.transfer
 * uplink.source
 * ptr.%d.href
-* ptr.%d.role
+* ptr.%d.role (value = inter-console note)
 
-if no mime types are set in the module config or none match, the plugin set the mimetype
+If no mime types are set in the module config or none match, the plugin set the mimetype
 property to: **text/plain**
 
-if no type is set in the module config, the plugin set the type property to:
+If no type is set in the module config, the plugin set the type property to:
 **uplink file**
 
-the icn plugin expects having as input file (specified in the location option) a csv file
-with the following fields (in the given order):
+The icn plugin expects having as input file (specified in the location option) a
+CSV file with the following fields (in the given order):
 
-* source ICN
-* uplinked file
-* original filename
-* command filename
-* filename used for uplink
-* sid
-* uplink time
-* transfer time
-* warning
-* file size
-* md5
+* Source ICN
+* Uplinked file
+* Original filename
+* Command filename
+* Filename used for uplink
+* Source Id
+* Uplink time
+* Transfer time
+* Warning
+* File size
+* File MD5
 
-this kind of file can be generated thanks to the script scripts/icn.awk
+This kind of file can be generated thanks to the script scripts/icn.awk
 
-### csv
+The ICN plugin does not treat the first line as a line containing some headers.
+
+### csv plugin
 
 the csv plugin set the following experiment specific metadata:
 
@@ -283,7 +330,7 @@ the csv plugin set the following experiment specific metadata:
 the csv plugin expects that all the rows in the input files contains exactly the same
 number of fields.
 
-### mbox
+### mbox plugin
 
 currently the mbox plugin is the only one using its own configuration file.
 
