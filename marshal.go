@@ -60,6 +60,7 @@ func (b *filebuilder) copyFile(file string, d Data) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
+	defer fmt.Fprintln(os.Stderr, file, newfile)
 	switch b.link {
 	case "soft":
 		return os.Symlink(file, newfile)
@@ -71,7 +72,7 @@ func (b *filebuilder) copyFile(file string, d Data) error {
 			return err
 		}
 		defer r.Close()
-		
+
 		w, err := os.Create(newfile)
 		if err != nil {
 			return err
@@ -126,6 +127,7 @@ func (b *zipbuilder) Close() error {
 }
 
 func (b *zipbuilder) copyFile(file string, d Data) error {
+	defer fmt.Fprintln(os.Stderr, file, d.Info.File)
 	r, err := os.Open(file)
 	if err != nil {
 		return err
