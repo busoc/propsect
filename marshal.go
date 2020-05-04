@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -17,11 +18,19 @@ type marshaler interface {
 	marshalMeta(Meta) error
 }
 
-func newMarshaler(file string) (marshaler, error) {
+func newMarshaler(file, link string) (marshaler, error) {
 	ext := filepath.Ext(file)
 	if i, err := os.Stat(file); ext == "" || (err == nil && i.IsDir()) {
+		switch strings.ToLower(link) {
+		case "":
+		case "hard":
+		case "soft":
+		default:
+			return nil, fmt.Errorf("unsupported link type: %s", link)
+		}
 		f := filebuilder{
 			rootdir: file,
+			link: link,
 		}
 		return &f, nil
 	}
@@ -43,28 +52,35 @@ func newMarshaler(file string) (marshaler, error) {
 
 type filebuilder struct {
 	rootdir string
+	link    string
 }
 
 func (b *filebuilder) copyFile(file string, d Data) error {
-	r, err := os.Open(file)
-	if err != nil {
-		return err
-	}
-	defer r.Close()
-
-	file = filepath.Join(b.rootdir, d.Info.File)
+	newfile := filepath.Join(b.rootdir, d.Info.File)
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
+	switch b.link {
+	case "soft":
+		return os.Symlink(file, newfile)
+	case "hard":
+		return os.Link(file, newfile)
+	default:
+		r, err := os.Open(file)
+		if err != nil {
+			return err
+		}
+		defer r.Close()
+		
+		w, err := os.Create(newfile)
+		if err != nil {
+			return err
+		}
+		defer w.Close()
 
-	w, err := os.Create(file)
-	if err != nil {
+		_, err = io.Copy(w, r)
 		return err
 	}
-	defer w.Close()
-
-	_, err = io.Copy(w, r)
-	return err
 }
 
 func (b *filebuilder) marshalData(d Data) error {

@@ -270,7 +270,8 @@ number of fields.
 
 ### mbox
 
-currently the mbox plugin is the only one using its own configuration file.
+currently the mbox plugin is the only one using its own configuration file. This
+configuration file is structured as follow:
 
 the mbox plugin set the following experiment specific metadata:
 

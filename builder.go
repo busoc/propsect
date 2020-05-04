@@ -40,6 +40,7 @@ func NewBuilder(file, schedule string) (*Builder, error) {
 		Archive string
 		Dry     bool `toml:"no-data"`
 		Path    string
+		Link    string
 
 		Meta
 		Data    `toml:"dataset"`
@@ -51,7 +52,7 @@ func NewBuilder(file, schedule string) (*Builder, error) {
 	if err := os.MkdirAll(filepath.Dir(c.Archive), 0755); err != nil {
 		return nil, err
 	}
-	m, err := newMarshaler(c.Archive)
+	m, err := newMarshaler(c.Archive, c.Link)
 	if err != nil {
 		return nil, err
 	}
