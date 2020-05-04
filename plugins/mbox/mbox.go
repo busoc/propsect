@@ -68,6 +68,9 @@ func (m *module) Process() (prospect.FileInfo, error) {
 	if p.Info.Type == "" {
 		p.Info.Type = m.cfg.Type
 	}
+	if p.Info.Type == "" {
+		p.Info.Type = prospect.TypeData
+	}
 	p.Info.Integrity = m.cfg.Integrity
 	return p.Info, p.Err
 }
