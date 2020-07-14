@@ -32,6 +32,7 @@ const (
 )
 
 const (
+	levelLevel  = "level"
 	levelSource = "source"
 	levelModel  = "model"
 	levelMime   = "mime"
@@ -142,6 +143,8 @@ func (f fragment) Resolve(dat Data) string {
 	switch strings.ToLower(f.name) {
 	default:
 		// str = "unknown"
+	case levelLevel:
+		str = strconv.Itoa(dat.Level)
 	case levelSource:
 		str = replace(dat.Source)
 	case levelModel:
