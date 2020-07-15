@@ -33,7 +33,7 @@ function parseFilename(str) {
   gsub(/^_|_$/, "", info["origin"])
 }
 
-function dump(i) {
+function dump(i, files) {
   ori = data[i]["origin"]
   gsub(/File_/, "", ori)
 
@@ -51,12 +51,20 @@ function dump(i) {
   file = data[i]["filename"]
   size = data[i]["size"]
   cksum = data[i]["checksum"]
+  gsub(/\s+/, "", cksum)
 
   day = data[i]["day"]
   uplink = data[i]["uplink"] == "" ? day" "data[i]["time"] : day" "data[i]["uplink"]
   transfer = data[i]["transfer"] == "" ? "" : day" "data[i]["transfer"]
 
   flag = data[i]["flag"] == "" ? "-" : "*"
+
+  if (list && !(cksum in files)) {
+    return
+  }
+  if (list) {
+    cmd = files[cksum]
+  }
 
   if (format == "csv" || format == "") {
     print FILENAME, file, ori, cmd, slot, sid, uplink, transfer, flag, size, cksum
@@ -113,7 +121,13 @@ BEGIN {
   warning = "*"
 }
 END {
+  if (list != "") {
+    while(getline line < list) {
+      split(line, fs, /\s+/)
+      files[fs[2]] = fs[1]
+    }
+  }
   for (i in data) {
-    dump(i)
+    dump(i, files)
   }
 }
