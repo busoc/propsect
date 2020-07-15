@@ -145,6 +145,7 @@ func (b *Builder) gatherInfo(db *bolt.DB, mod Module, cfg Config) error {
 				break
 			}
 			i.Parameters = append(i.Parameters, ps...)
+			fmt.Fprintf(os.Stderr, "%s: %s %d %s\n", i.File, i.Sum, i.Size, i.AcqTime.Format("2006-01-02 15:04:05"))
 
 			x := b.data
 			x.Experiment = b.meta.Name
