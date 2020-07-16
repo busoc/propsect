@@ -30,7 +30,7 @@ func newMarshaler(file, link string) (marshaler, error) {
 		}
 		f := filebuilder{
 			rootdir: file,
-			link: link,
+			link:    link,
 		}
 		return &f, nil
 	}

@@ -99,6 +99,7 @@ func (m *module) startList(row []string) (prospect.FileInfo, error) {
 			i.Type = prospect.TypeUplinkNote
 		}
 		i.Integrity = m.cfg.Integrity
+		i.Level = m.cfg.Level
 	}
 	return i, err
 }
@@ -115,6 +116,7 @@ func (m *module) startRecord(row []string) (prospect.FileInfo, error) {
 			i.Type = prospect.TypeUplinkFile
 		}
 		i.Integrity = m.cfg.Integrity
+		i.Level = m.cfg.Level
 	case prospect.ErrSkip:
 	default:
 		err = fmt.Errorf("%s: %s", row[1], err)

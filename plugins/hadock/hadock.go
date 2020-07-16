@@ -156,6 +156,7 @@ func (m module) Process() (prospect.FileInfo, error) {
 			i.Type = prospect.TypeHighRateData
 		}
 		i.Integrity = m.cfg.Integrity
+		i.Level = m.cfg.Level
 	case prospect.ErrSkip:
 	default:
 		err = fmt.Errorf("%s: %s", file, err)
