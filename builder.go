@@ -149,8 +149,11 @@ func (b *Builder) gatherInfo(db *bolt.DB, mod Module, cfg Config) error {
 
 			x := b.data
 			x.Experiment = b.meta.Name
-			x.Source = src
+			if x.Source == "" {
+				x.Source = src
+			}
 			x.Info = i
+			x.Level = i.Level
 
 			err = db.Update(func(tx *bolt.Tx) error {
 				var (

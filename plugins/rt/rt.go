@@ -62,6 +62,7 @@ func (m module) Process() (prospect.FileInfo, error) {
 			i.Mime = prospect.TypeRawTelemetry
 		}
 		i.Integrity = m.cfg.Integrity
+		i.Level = m.cfg.Level
 	} else {
 		err = fmt.Errorf("%s: %s", file, err)
 	}
