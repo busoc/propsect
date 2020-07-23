@@ -126,10 +126,57 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 		return nil
 	})
 
-	if err := b.gatherInfo(db, mod, cfg); err != nil {
+	if mod.Indexable() {
+		if err := b.gatherInfo(db, mod, cfg); err != nil {
+			return err
+		}
+		return b.buildArchive(db)
+	}
+	return b.build(mod, cfg)
+}
+
+func (b *Builder) build(mod Module, cfg Config) error {
+	resolve, err := cfg.resolver()
+	if err != nil {
 		return err
 	}
-	return b.buildArchive(db)
+	for {
+		switch i, err := mod.Process(); err {
+		case nil:
+			src, ps := b.schedule.Keep(i)
+			if src == "" {
+				break
+			}
+			i.Parameters = append(i.Parameters, ps...)
+			fmt.Fprintf(os.Stderr, "%s: %s %d %s\n", i.File, i.Sum, i.Size, i.AcqTime.Format("2006-01-02 15:04:05"))
+
+			x := b.data
+			x.Experiment = b.meta.Name
+			if x.Source == "" {
+				x.Source = src
+			}
+			x.Info = i
+			x.Level = i.Level
+
+			original := x.Info.File
+			x.Info.File = filepath.Join(resolve.Resolve(x), filepath.Base(x.Info.File))
+
+			if err := b.marshalData(x); err != nil {
+				return err
+			}
+			if b.dryrun {
+				return nil
+			}
+			if err := b.copyFile(original, x); err != nil {
+				return err
+			}
+		case ErrSkip:
+		case ErrDone:
+			return nil
+		default:
+			return fmt.Errorf("%s: %s", mod, err)
+		}
+	}
 }
 
 func (b *Builder) gatherInfo(db *bolt.DB, mod Module, cfg Config) error {
