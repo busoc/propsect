@@ -56,6 +56,10 @@ func (m *module) String() string {
 	return "mail"
 }
 
+func (m module) Indexable() bool {
+	return true
+}
+
 func (m *module) Process() (prospect.FileInfo, error) {
 	p, ok := <-m.queue
 	if !ok {

@@ -133,6 +133,10 @@ func (m module) String() string {
 	return "hadock"
 }
 
+func (m module) Indexable() bool {
+	return false
+}
+
 func (m module) Process() (prospect.FileInfo, error) {
 	var file string
 	for {

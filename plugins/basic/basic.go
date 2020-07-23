@@ -38,6 +38,10 @@ func (m module) String() string {
 	return "basic"
 }
 
+func (m module) Indexable() bool {
+	return false
+}
+
 func (m module) Process() (prospect.FileInfo, error) {
 	file := m.source.Glob()
 	if file == "" {

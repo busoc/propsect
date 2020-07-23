@@ -59,6 +59,10 @@ func (m *module) String() string {
 	return "icn"
 }
 
+func (m module) Indexable() bool {
+	return true
+}
+
 func (m *module) Process() (prospect.FileInfo, error) {
 	var (
 		row []string

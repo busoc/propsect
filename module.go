@@ -42,6 +42,7 @@ type Link struct {
 
 type Module interface {
 	Process() (FileInfo, error)
+	Indexable() bool
 	fmt.Stringer
 }
 

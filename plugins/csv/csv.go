@@ -42,6 +42,10 @@ func (m *module) String() string {
 	return "csv"
 }
 
+func (m *module) Indexable() bool {
+	return false
+}
+
 func (m *module) Process() (prospect.FileInfo, error) {
 	file := m.source.Glob()
 	if file == "" {
