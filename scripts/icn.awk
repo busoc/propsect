@@ -62,9 +62,9 @@ function dump(i, files) {
   if (list && !(cksum in files)) {
     return
   }
-  if (list) {
-    cmd = files[cksum]
-  }
+  #if (list) {
+  #  cmd = files[cksum]
+  #}
 
   if (format == "csv" || format == "") {
     print FILENAME, file, ori, cmd, slot, sid, uplink, transfer, flag, size, cksum
