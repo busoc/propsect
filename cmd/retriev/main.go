@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -21,6 +22,8 @@ import (
 
 const API = "/api/archive/%s/downloads/parameters/"
 const Day = time.Hour * 24
+
+type TimeFunc func(time.Time) error
 
 type Date struct {
 	time.Time
@@ -98,14 +101,18 @@ func fetchData(dir string, api url.URL, body []byte, starts, ends time.Time) err
 	if ends.Before(starts) {
 		return fmt.Errorf("invalid interval")
 	}
-	return timeRange(starts, ends, Day, func(when time.Time) error {
+	err := timeRange(starts, ends, Day, func(when time.Time) error {
 		var (
-			year = fmt.Sprintf("%04d", starts.Year())
-			doy  = fmt.Sprintf("%03d", starts.YearDay())
+			year = fmt.Sprintf("%04d", when.Year())
+			doy  = fmt.Sprintf("%03d", when.YearDay())
 			file = filepath.Join(dir, year, doy) + ".tar"
 		)
 		return create(file, api, when, body)
 	})
+	if errors.Is(err, io.EOF) {
+		err = nil
+	}
+	return err
 }
 
 func create(file string, api url.URL, when time.Time, body []byte) error {
@@ -124,6 +131,7 @@ func create(file string, api url.URL, when time.Time, body []byte) error {
 	defer tw.Close()
 
 	return timeRange(when, when.Add(Day), time.Hour, func(when time.Time) error {
+		time.Sleep(time.Second)
 		req, err := prepare(api, when, body)
 		if err != nil {
 			return err
@@ -167,10 +175,7 @@ func prepare(api url.URL, when time.Time, body []byte) (*http.Request, error) {
 
 func writeData(ws io.WriteSeeker, req *http.Request) (int64, error) {
 	z, _ := gzip.NewWriterLevel(ws, gzip.BestCompression)
-	defer z.Close()
 
-	log.Printf("start query %s", req.URL.String())
-	defer log.Printf("done query %s", req.URL.String())
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return 0, err
@@ -181,18 +186,23 @@ func writeData(ws io.WriteSeeker, req *http.Request) (int64, error) {
 	if err != nil {
 		return size, err
 	}
+	if err := z.Close(); err != nil {
+		return size, err
+	}
 	_, err = ws.Seek(0, io.SeekStart)
 	return size, err
 }
 
-func timeRange(starts, ends time.Time, step time.Duration, fn func(when time.Time) error) error {
+func timeRange(starts, ends time.Time, step time.Duration, fn TimeFunc) error {
 	if starts.After(ends) {
 		return fmt.Errorf("invalid interval: %s - %s", starts, ends)
 	}
 	var err error
-	for starts.Before(ends) && err == nil {
-		err = fn(starts)
-		starts.Add(step)
+	for starts.Before(ends) {
+		if err = fn(starts); err != nil {
+			break
+		}
+		starts = starts.Add(step)
 	}
 	return err
 }
