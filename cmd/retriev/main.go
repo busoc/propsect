@@ -101,7 +101,7 @@ func fetchData(dir string, api url.URL, body []byte, starts, ends time.Time) err
 	if ends.Before(starts) {
 		return fmt.Errorf("invalid interval")
 	}
-	err := timeRange(starts, ends, Day, func(when time.Time) error {
+	return timeRange(starts, ends, Day, func(when time.Time) error {
 		var (
 			year = fmt.Sprintf("%04d", when.Year())
 			doy  = fmt.Sprintf("%03d", when.YearDay())
@@ -109,10 +109,6 @@ func fetchData(dir string, api url.URL, body []byte, starts, ends time.Time) err
 		)
 		return create(file, api, when, body)
 	})
-	if errors.Is(err, io.EOF) {
-		err = nil
-	}
-	return err
 }
 
 func create(file string, api url.URL, when time.Time, body []byte) error {
@@ -148,16 +144,31 @@ func create(file string, api url.URL, when time.Time, body []byte) error {
 		if size, err := writeData(rw, req); err != nil || size == 0 {
 			return err
 		}
-		h, err := makeHeader(rw, when)
-		if err != nil {
-			return err
-		}
-		if err := tw.WriteHeader(&h); err != nil {
-			return err
-		}
-		_, err = io.Copy(tw, rw)
-		return err
+		return appendFile(tw, rw, when)
 	})
+}
+
+func appendFile(tw *tar.Writer, rw *os.File, when time.Time) error {
+	if _, err := rw.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	z, err := rw.Stat()
+	if err != nil {
+		return err
+	}
+	h := tar.Header{
+		Name:    fmt.Sprintf("%02d.csv.gz", when.Hour()),
+		Size:    z.Size(),
+		ModTime: when.UTC(),
+		Uid:     1000,
+		Gid:     1000,
+		Mode:    0644,
+	}
+	if err := tw.WriteHeader(&h); err != nil {
+		return err
+	}
+	_, err = io.Copy(tw, rw)
+	return err
 }
 
 func prepare(api url.URL, when time.Time, body []byte) (*http.Request, error) {
@@ -175,6 +186,7 @@ func prepare(api url.URL, when time.Time, body []byte) (*http.Request, error) {
 
 func writeData(ws io.WriteSeeker, req *http.Request) (int64, error) {
 	z, _ := gzip.NewWriterLevel(ws, gzip.BestCompression)
+	defer z.Close()
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -182,15 +194,7 @@ func writeData(ws io.WriteSeeker, req *http.Request) (int64, error) {
 	}
 	defer resp.Body.Close()
 
-	size, err := io.Copy(z, resp.Body)
-	if err != nil {
-		return size, err
-	}
-	if err := z.Close(); err != nil {
-		return size, err
-	}
-	_, err = ws.Seek(0, io.SeekStart)
-	return size, err
+	return io.Copy(z, resp.Body)
 }
 
 func timeRange(starts, ends time.Time, step time.Duration, fn TimeFunc) error {
@@ -199,7 +203,7 @@ func timeRange(starts, ends time.Time, step time.Duration, fn TimeFunc) error {
 	}
 	var err error
 	for starts.Before(ends) {
-		if err = fn(starts); err != nil {
+		if err = fn(starts); err != nil && !errors.Is(err, io.EOF) {
 			break
 		}
 		starts = starts.Add(step)
@@ -246,20 +250,4 @@ func mkdir(base, dir, file string) (string, error) {
 	name := strings.TrimSuffix(strings.TrimPrefix(file, base), filepath.Ext(file))
 	dir = filepath.Join(dir, name)
 	return dir, os.MkdirAll(dir, 0755)
-}
-
-func makeHeader(rw *os.File, when time.Time) (tar.Header, error) {
-	z, err := rw.Stat()
-	if err != nil {
-		return tar.Header{}, err
-	}
-	hdr := tar.Header{
-		Name:    fmt.Sprintf("%02d.csv.gz", when.Hour()),
-		Size:    z.Size(),
-		ModTime: when.UTC(),
-		Uid:     1000,
-		Gid:     1000,
-		Mode:    0644,
-	}
-	return hdr, nil
 }
