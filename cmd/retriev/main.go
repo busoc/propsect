@@ -1,13 +1,16 @@
 package main
 
 import (
+	"archive/tar"
 	"bufio"
 	"bytes"
-	// "compress/gzip"
+	"compress/gzip"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -64,24 +67,23 @@ func main() {
 		Path:   fmt.Sprintf(API, *instance),
 		User:   url.UserPassword(*user, *passwd),
 	}
-	_ = u
 
 	base := filepath.Clean(flag.Arg(0))
 	err := filepath.Walk(base, func(p string, i os.FileInfo, err error) error {
 		if err != nil || i.IsDir() {
 			return err
 		}
-		if filepath.Ext(p) == ".txt" {
-			var (
-				name = strings.TrimSuffix(strings.TrimPrefix(p, base), filepath.Ext(p))
-				dir  = filepath.Join(flag.Arg(1), name)
-			)
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				return err
-			}
-			err = fetchData(p, dir, u, dtstart.Time, dtend.Time)
+		if filepath.Ext(p) != ".txt" {
+			return nil
 		}
-		return err
+		var (
+			name = strings.TrimSuffix(strings.TrimPrefix(p, base), filepath.Ext(p))
+			dir  = filepath.Join(flag.Arg(1), name)
+		)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+		return fetchData(p, dir, u, dtstart.Time.UTC(), dtend.Time.UTC())
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -97,28 +99,17 @@ func fetchData(file, dir string, u url.URL, starts, ends time.Time) error {
 	if err != nil {
 		return err
 	}
-	vs := url.Values{}
 	for starts.Before(ends) {
-		vs.Set("start", starts.Format(time.RFC3339))
-		vs.Set("stop", starts.Add(Day).Format(time.RFC3339))
-		u.RawQuery = vs.Encode()
-
-		req, err := http.NewRequest(http.MethodPost, u.String(), body)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("accept", "text/csv")
-		file := filepath.Join(dir, fmt.Sprintf("%04d", starts.Year()), fmt.Sprintf("%03d.csv", starts.YearDay()))
-		if err := execute(file, req); err != nil {
+		file := filepath.Join(dir, fmt.Sprintf("%04d", starts.Year()), fmt.Sprintf("%03d.tar", starts.YearDay()))
+		if err := create(file, u, starts, body); err != nil {
 			return err
 		}
 		starts = starts.Add(Day)
-		time.Sleep(5 * time.Second)
 	}
 	return nil
 }
 
-func execute(file string, req *http.Request) error {
+func create(file string, u url.URL, when time.Time, body []byte) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
@@ -127,23 +118,85 @@ func execute(file string, req *http.Request) error {
 		return err
 	}
 	defer w.Close()
+	log.Printf("create %s", file)
 
-	// z, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
-	// defer z.Close()
+	tw := tar.NewWriter(w)
+	defer tw.Close()
 
-	fmt.Println("start query", req.URL.String())
-	defer fmt.Println("done query", req.URL.String())
+	retr := func(req *http.Request, when time.Time) error {
+		rw, err := ioutil.TempFile("", "data*.csv.gz")
+		if err != nil {
+			return err
+		}
+		defer func() {
+			rw.Close()
+			os.Remove(rw.Name())
+		}()
+
+		if size, err := execute(rw, req); err != nil || size == 0 {
+			return err
+		}
+		if _, err := rw.Seek(0, io.SeekStart); err != nil {
+			return err
+		}
+		z, err := rw.Stat()
+		if err != nil {
+			return err
+		}
+		h := tar.Header{
+			Name:    fmt.Sprintf("%02d.csv.gz", when.Hour()),
+			Size:    z.Size(),
+			ModTime: when.UTC(),
+			Uid:     1000,
+			Gid:     1000,
+			Mode:    0644,
+		}
+		if err := tw.WriteHeader(&h); err != nil {
+			return err
+		}
+		_, err = io.Copy(tw, rw)
+		return err
+	}
+
+	vs := url.Values{}
+	for i := 0; i < 24; i++ {
+		var (
+			starts = when.Add(time.Duration(i) * time.Hour)
+			ends   = starts.Add(time.Hour)
+		)
+
+		vs.Set("start", starts.Format(time.RFC3339))
+		vs.Set("stop", ends.Format(time.RFC3339))
+		u.RawQuery = vs.Encode()
+
+		req, err := http.NewRequest(http.MethodPost, u.String(), bytes.NewReader(body))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("accept", "text/csv")
+		if err := retr(req, starts); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func execute(w io.Writer, req *http.Request) (int64, error) {
+	z, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
+	defer z.Close()
+
+	log.Printf("start query %s", req.URL.String())
+	defer log.Printf("done query %s", req.URL.String())
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer resp.Body.Close()
 
-	_, err = io.Copy(w, resp.Body)
-	return err
+	return io.Copy(z, resp.Body)
 }
 
-func loadList(file string) (io.Reader, error) {
+func loadList(file string) ([]byte, error) {
 	type pair struct {
 		Name  string `json:"name"`
 		Space string `json:"namespace,omitempty"`
@@ -175,10 +228,5 @@ func loadList(file string) (io.Reader, error) {
 	}{
 		Id: ds,
 	}
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(datum); err != nil {
-		return nil, err
-	}
-	return &buf, nil
+	return json.Marshal(datum)
 }
