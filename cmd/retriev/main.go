@@ -60,6 +60,7 @@ func main() {
 		instance = flag.String("i", "demo", "instance")
 		user     = flag.String("u", "user", "username")
 		passwd   = flag.String("p", "passwd", "password")
+		// format   = flag.String("f", "", "format")
 		// archive  = flag.String("t", "", "archive type")
 	)
 	flag.Var(&dtstart, "f", "from date")
@@ -119,12 +120,21 @@ func create(file string, api url.URL, when time.Time, body []byte) error {
 	if err != nil {
 		return err
 	}
-	defer w.Close()
 	log.Printf("begin writting %s", file)
 	defer log.Printf("end writting %s", file)
 
-	tw := tar.NewWriter(w)
-	defer tw.Close()
+	var (
+		written int
+		tw = tar.NewWriter(w)
+	)
+	defer func() {
+		tw.Close()
+		w.Close()
+
+		if written == 0 {
+			os.Remove(file)
+		}
+	}()
 
 	return timeRange(when, when.Add(Day), time.Hour, func(when time.Time) error {
 		time.Sleep(time.Second)
@@ -144,6 +154,7 @@ func create(file string, api url.URL, when time.Time, body []byte) error {
 		if size, err := writeData(rw, req); err != nil || size == 0 {
 			return err
 		}
+		written++
 		return appendFile(tw, rw, when)
 	})
 }
