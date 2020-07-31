@@ -12,9 +12,12 @@ import (
 )
 
 func main() {
-	all := flag.Bool("a", false, "print all")
-	self := flag.Bool("k", false, "keep self including container")
-	dir := flag.String("d", "", "directory")
+	var (
+		all  = flag.Bool("a", false, "print all")
+		self = flag.Bool("k", false, "keep self including container")
+		dir  = flag.String("d", "", "directory")
+		clean = flag.Bool("c", false, "clean")
+	)
 	flag.Parse()
 
 	var r io.Reader
@@ -34,7 +37,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(3)
 	}
-	updateData(data, *self)
+	if *clean {
+		cleanData(data)
+	} else {
+		updateData(data, *self)
+	}
 	if *dir == "" {
 		printData(data, *all)
 		return
@@ -61,7 +68,7 @@ type Container struct {
 }
 
 func (c Container) Skip() bool {
-	return c.Root || c.Base == "" || c.Abstract
+	return c.Root || c.Base == "" || c.Abstract || len(c.Entries) == 0
 }
 
 func (c Container) Clone() Container {
@@ -74,6 +81,23 @@ func (c Container) Clone() Container {
 func readData(r io.Reader) ([]Container, error) {
 	var data []Container
 	return data, json.NewDecoder(r).Decode(&data)
+}
+
+func cleanData(data []Container) {
+	for i, d := range data {
+		es := make([]Entry, 0, len(d.Entries))
+		for _, e := range d.Entries {
+			if e.Include {
+				continue
+			}
+			es = append(es, e)
+		}
+		data[i].Entries = data[i].Entries[:0]
+		data[i].Entries = append(data[i].Entries, es...)
+		data[i].Abstract = false
+		data[i].Root = false
+		data[i].Fill = true
+	}
 }
 
 func updateData(data []Container, self bool) {
@@ -92,19 +116,21 @@ func updateEntries(curr *Container, data []Container, self bool) {
 	if curr.Fill {
 		return
 	}
-	defer func() {
-		curr.Fill = true
-	}()
-	x := sort.Search(len(data), func(j int) bool {
-		return data[j].Name >= curr.Base
-	})
-	if x >= len(data) || data[x].Name != curr.Base {
-		return
-	}
+	defer func() { curr.Fill = true }()
 
-	clone := data[x].Clone()
-	updateEntries(&clone, data, self)
-	data[x] = clone
+	var clone Container
+	if curr.Base != "" {
+		x := sort.Search(len(data), func(j int) bool {
+			return data[j].Name >= curr.Base
+		})
+		if x >= len(data) || data[x].Name != curr.Base {
+			return
+		}
+
+		clone = data[x].Clone()
+		updateEntries(&clone, data, self)
+		data[x] = clone
+	}
 
 	es := make([]Entry, len(clone.Entries)+len(curr.Entries))
 	n := copy(es, clone.Entries)
@@ -119,7 +145,7 @@ func updateEntries(curr *Container, data []Container, self bool) {
 			continue
 		}
 		if e.Include {
-			x = sort.Search(len(data), func(i int) bool { return data[i].Name >= e.Name })
+			x := sort.Search(len(data), func(i int) bool { return data[i].Name >= e.Name })
 			if x < len(data) && data[x].Name == e.Name {
 				clone := data[x].Clone()
 				updateEntries(&clone, data, self)
@@ -140,7 +166,7 @@ func updateEntries(curr *Container, data []Container, self bool) {
 		sort.Slice(xs, func(i, j int) bool {
 			return xs[i].Base < xs[j].Base
 		})
-		x = sort.Search(len(xs), func(j int) bool {
+		x := sort.Search(len(xs), func(j int) bool {
 			return xs[j].Base >= curr.Name
 		})
 		curr.Abstract = x < len(xs) && xs[x].Base == curr.Name
