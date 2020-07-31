@@ -20,7 +20,10 @@ import (
 	"time"
 )
 
-const API = "/api/archive/%s/downloads/parameters/"
+const (
+	APIP = "/api/archive/%s/downloads/parameters/"
+	APIE = "/api/archive/%s/downloads/events/"
+)
 const Day = time.Hour * 24
 
 type TimeFunc func(time.Time) error
@@ -61,7 +64,7 @@ func main() {
 		user     = flag.String("u", "user", "username")
 		passwd   = flag.String("p", "passwd", "password")
 		// format   = flag.String("f", "", "format")
-		// archive  = flag.String("t", "", "archive type")
+		archive  = flag.String("a", "", "archive type")
 	)
 	flag.Var(&dtstart, "f", "from date")
 	flag.Var(&dtend, "t", "to date")
@@ -70,15 +73,32 @@ func main() {
 	u := url.URL{
 		Scheme: "http",
 		Host:   *remote,
-		Path:   fmt.Sprintf(API, *instance),
 		User:   url.UserPassword(*user, *passwd),
 	}
 	if *secure {
 		u.Scheme = "https"
 	}
+	var err error
+	switch strings.ToLower(*archive) {
+	case "", "parameters":
+		u.Path = fmt.Sprintf(APIP, *instance)
+		err = retrParameters(u, dtstart.Time.UTC(), dtend.Time.UTC(), flag.Arg(0), flag.Arg(1))
+	case "events":
+		u.Path = fmt.Sprintf(APIE, *instance)
+		err = retrEvents(u, dtstart.Time.UTC(), dtend.Time.UTC(), flag.Arg(0))
+	default:
+		err = fmt.Errorf("%s: unknown archive type", *archive)
+		os.Exit(2)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+}
 
-	base := filepath.Clean(flag.Arg(0))
-	err := filepath.Walk(base, func(file string, i os.FileInfo, err error) error {
+func retrParameters(api url.URL, dtstart, dtend time.Time, base, dir string) error {
+	base = filepath.Clean(base)
+	return filepath.Walk(base, func(file string, i os.FileInfo, err error) error {
 		if err != nil || i.IsDir() {
 			return err
 		}
@@ -89,13 +109,16 @@ func main() {
 		if err != nil {
 			return err
 		}
-		dir, err := mkdir(base, flag.Arg(1), file)
-		return fetchData(dir, u, body, dtstart.Time.UTC(), dtend.Time.UTC())
+		dst, err := mkdir(base, flag.Arg(1), file)
+		if err == nil {
+			err = fetchData(dst, api, body, dtstart, dtend)
+		}
+		return err
 	})
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
-	}
+}
+
+func retrEvents(api url.URL, dtstart, dtend time.Time, dir string) error {
+	return fetchData(dir, api, nil, dtstart, dtend)
 }
 
 func fetchData(dir string, api url.URL, body []byte, starts, ends time.Time) error {
@@ -188,7 +211,12 @@ func prepare(api url.URL, when time.Time, body []byte) (*http.Request, error) {
 	vs.Set("stop", when.Add(time.Hour).Format(time.RFC3339))
 	api.RawQuery = vs.Encode()
 
-	req, err := http.NewRequest(http.MethodPost, api.String(), bytes.NewReader(body))
+	method := http.MethodGet
+	if len(body) > 0 {
+		method = http.MethodPost
+	}
+
+	req, err := http.NewRequest(method, api.String(), bytes.NewReader(body))
 	if err == nil {
 		req.Header.Set("accept", "text/csv")
 	}
