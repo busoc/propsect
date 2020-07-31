@@ -13,9 +13,9 @@ import (
 
 func main() {
 	var (
-		all  = flag.Bool("a", false, "print all")
-		self = flag.Bool("k", false, "keep self including container")
-		dir  = flag.String("d", "", "directory")
+		all   = flag.Bool("a", false, "print all")
+		self  = flag.Bool("k", false, "keep self including container")
+		dir   = flag.String("d", "", "directory")
 		clean = flag.Bool("c", false, "clean")
 	)
 	flag.Parse()

@@ -64,7 +64,7 @@ func main() {
 		user     = flag.String("u", "user", "username")
 		passwd   = flag.String("p", "passwd", "password")
 		// format   = flag.String("f", "", "format")
-		archive  = flag.String("a", "", "archive type")
+		archive = flag.String("a", "", "archive type")
 	)
 	flag.Var(&dtstart, "f", "from date")
 	flag.Var(&dtend, "t", "to date")
@@ -148,7 +148,7 @@ func create(file string, api url.URL, when time.Time, body []byte) error {
 
 	var (
 		written int
-		tw = tar.NewWriter(w)
+		tw      = tar.NewWriter(w)
 	)
 	defer func() {
 		tw.Close()
