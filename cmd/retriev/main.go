@@ -23,8 +23,55 @@ import (
 const (
 	APIP = "/api/archive/%s/downloads/parameters/"
 	APIE = "/api/archive/%s/downloads/events/"
+	APIC = "/api/archive/%s/commands"
 )
 const Day = time.Hour * 24
+
+// retr [-r remote] [-i instance] [-f from] [-t to] <listing dir> <archive dir>
+func main() {
+	var (
+		dtstart  = NewDate(-7 * Day)
+		dtend    = NewDate(1)
+		secure   = flag.Bool("https", false, "https")
+		remote   = flag.String("r", "localhost:8090", "remote host (host:port)")
+		instance = flag.String("i", "demo", "instance")
+		user     = flag.String("u", "user", "username")
+		passwd   = flag.String("p", "passwd", "password")
+		minify   = flag.Bool("c", false, "compress downloaded files")
+		archive  = flag.String("a", "", "archive type")
+	)
+	flag.Var(&dtstart, "f", "from date")
+	flag.Var(&dtend, "t", "to date")
+	flag.Parse()
+
+	u := url.URL{
+		Scheme: "http",
+		Host:   *remote,
+		User:   url.UserPassword(*user, *passwd),
+	}
+	if *secure {
+		u.Scheme = "https"
+	}
+	var err error
+	switch strings.ToLower(*archive) {
+	case "", "parameters":
+		u.Path = fmt.Sprintf(APIP, *instance)
+		err = retrParameters(u, *minify, dtstart.Time.UTC(), dtend.Time.UTC(), flag.Arg(0), flag.Arg(1))
+	case "events":
+		u.Path = fmt.Sprintf(APIE, *instance)
+		err = retrEvents(u, *minify, dtstart.Time.UTC(), dtend.Time.UTC(), flag.Arg(0))
+	case "commands":
+		u.Path = fmt.Sprintf(APIC, *instance)
+		err = retrCommands(u, *minify, dtstart.Time.UTC(), dtend.Time.UTC(), flag.Arg(0))
+	default:
+		err = fmt.Errorf("%s: unknown archive type", *archive)
+		os.Exit(2)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+}
 
 type TimeFunc func(time.Time) error
 
@@ -53,50 +100,107 @@ func (d *Date) String() string {
 	return d.Format("2006-01-02")
 }
 
-// retr [-r remote] [-i instance] [-f from] [-t to] <listing dir> <archive dir>
-func main() {
-	var (
-		dtstart  = NewDate(-7 * Day)
-		dtend    = NewDate(1)
-		secure   = flag.Bool("https", false, "https")
-		remote   = flag.String("r", "localhost:8090", "remote host (host:port)")
-		instance = flag.String("i", "demo", "instance")
-		user     = flag.String("u", "user", "username")
-		passwd   = flag.String("p", "passwd", "password")
-		// format   = flag.String("f", "", "format")
-		archive = flag.String("a", "", "archive type")
-	)
-	flag.Var(&dtstart, "f", "from date")
-	flag.Var(&dtend, "t", "to date")
-	flag.Parse()
+const (
+	fmtText uint8 = iota
+	fmtCsv
+	fmtJson
+)
 
-	u := url.URL{
-		Scheme: "http",
-		Host:   *remote,
-		User:   url.UserPassword(*user, *passwd),
-	}
-	if *secure {
-		u.Scheme = "https"
-	}
-	var err error
-	switch strings.ToLower(*archive) {
-	case "", "parameters":
-		u.Path = fmt.Sprintf(APIP, *instance)
-		err = retrParameters(u, dtstart.Time.UTC(), dtend.Time.UTC(), flag.Arg(0), flag.Arg(1))
-	case "events":
-		u.Path = fmt.Sprintf(APIE, *instance)
-		err = retrEvents(u, dtstart.Time.UTC(), dtend.Time.UTC(), flag.Arg(0))
-	default:
-		err = fmt.Errorf("%s: unknown archive type", *archive)
-		os.Exit(2)
-	}
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+type Request struct {
+	api    url.URL
+	body   []byte
+	format uint8
+	mini   bool
+}
+
+func TextRequest(api url.URL, body []byte, minify bool) Request {
+	return Request{
+		api:    api,
+		body:   body,
+		format: fmtText,
+		mini:   minify,
 	}
 }
 
-func retrParameters(api url.URL, dtstart, dtend time.Time, base, dir string) error {
+func CsvRequest(api url.URL, body []byte, minify bool) Request {
+	return Request{
+		api:    api,
+		body:   body,
+		format: fmtCsv,
+		mini:   minify,
+	}
+}
+
+func JsonRequest(api url.URL, body []byte, minify bool) Request {
+	return Request{
+		api:    api,
+		body:   body,
+		format: fmtJson,
+		mini:   minify,
+	}
+}
+
+func (r Request) Ext() string {
+	var e string
+	switch r.format {
+	case fmtJson:
+		e = ".json"
+	case fmtText:
+		e = ".txt"
+	case fmtCsv:
+		e = ".csv"
+	default:
+		e = ".dat"
+	}
+	if r.mini {
+		e += ".gz"
+	}
+	return e
+}
+
+func (r Request) Copy(ws io.Writer, starts, ends time.Time) (int64, error) {
+	req, err := r.Make(starts, ends)
+	if err != nil {
+		return 0, err
+	}
+	if r.mini {
+		z, _ := gzip.NewWriterLevel(ws, gzip.BestCompression)
+		defer z.Close()
+		ws = z
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	return io.Copy(ws, resp.Body)
+}
+
+func (r Request) Make(starts, ends time.Time) (*http.Request, error) {
+	vs := url.Values{}
+	vs.Set("start", starts.Format(time.RFC3339))
+	vs.Set("stop", ends.Format(time.RFC3339))
+	r.api.RawQuery = vs.Encode()
+
+	method := http.MethodGet
+	if len(r.body) > 0 {
+		method = http.MethodPost
+	}
+
+	req, err := http.NewRequest(method, r.api.String(), bytes.NewReader(r.body))
+	if err == nil && r.isText() {
+		req.Header.Set("accept", "text/csv")
+	}
+	return req, err
+}
+
+func (r Request) isText() bool {
+	return r.format == fmtText || r.format == fmtCsv
+}
+
+func retrParameters(api url.URL, mini bool, dtstart, dtend time.Time, base, dir string) error {
 	base = filepath.Clean(base)
 	return filepath.Walk(base, func(file string, i os.FileInfo, err error) error {
 		if err != nil || i.IsDir() {
@@ -111,17 +215,22 @@ func retrParameters(api url.URL, dtstart, dtend time.Time, base, dir string) err
 		}
 		dst, err := mkdir(base, flag.Arg(1), file)
 		if err == nil {
-			err = fetchData(dst, api, body, dtstart, dtend)
+			req := TextRequest(api, body, mini)
+			err = fetchData(dst, req, dtstart, dtend)
 		}
 		return err
 	})
 }
 
-func retrEvents(api url.URL, dtstart, dtend time.Time, dir string) error {
-	return fetchData(dir, api, nil, dtstart, dtend)
+func retrCommands(api url.URL, mini bool, dtstart, dtend time.Time, dir string) error {
+	return fetchData(dir, JsonRequest(api, nil, mini), dtstart, dtend)
 }
 
-func fetchData(dir string, api url.URL, body []byte, starts, ends time.Time) error {
+func retrEvents(api url.URL, mini bool, dtstart, dtend time.Time, dir string) error {
+	return fetchData(dir, TextRequest(api, nil, mini), dtstart, dtend)
+}
+
+func fetchData(dir string, req Request, starts, ends time.Time) error {
 	if ends.Before(starts) {
 		return fmt.Errorf("invalid interval")
 	}
@@ -131,11 +240,11 @@ func fetchData(dir string, api url.URL, body []byte, starts, ends time.Time) err
 			doy  = fmt.Sprintf("%03d", when.YearDay())
 			file = filepath.Join(dir, year, doy) + ".tar"
 		)
-		return create(file, api, when, body)
+		return create(file, req, when)
 	})
 }
 
-func create(file string, api url.URL, when time.Time, body []byte) error {
+func create(file string, req Request, when time.Time) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
@@ -161,10 +270,6 @@ func create(file string, api url.URL, when time.Time, body []byte) error {
 
 	return timeRange(when, when.Add(Day), time.Hour, func(when time.Time) error {
 		time.Sleep(time.Second)
-		req, err := prepare(api, when, body)
-		if err != nil {
-			return err
-		}
 		rw, err := ioutil.TempFile("", "data*.csv.gz")
 		if err != nil {
 			return err
@@ -174,7 +279,7 @@ func create(file string, api url.URL, when time.Time, body []byte) error {
 			os.Remove(rw.Name())
 		}()
 
-		if size, err := writeData(rw, req); err != nil || size == 0 {
+		if size, err := req.Copy(rw, when, when.Add(time.Hour)); err != nil || size == 0 {
 			return err
 		}
 		written++
@@ -203,37 +308,6 @@ func appendFile(tw *tar.Writer, rw *os.File, when time.Time) error {
 	}
 	_, err = io.Copy(tw, rw)
 	return err
-}
-
-func prepare(api url.URL, when time.Time, body []byte) (*http.Request, error) {
-	vs := url.Values{}
-	vs.Set("start", when.Format(time.RFC3339))
-	vs.Set("stop", when.Add(time.Hour).Format(time.RFC3339))
-	api.RawQuery = vs.Encode()
-
-	method := http.MethodGet
-	if len(body) > 0 {
-		method = http.MethodPost
-	}
-
-	req, err := http.NewRequest(method, api.String(), bytes.NewReader(body))
-	if err == nil {
-		req.Header.Set("accept", "text/csv")
-	}
-	return req, err
-}
-
-func writeData(ws io.WriteSeeker, req *http.Request) (int64, error) {
-	z, _ := gzip.NewWriterLevel(ws, gzip.BestCompression)
-	defer z.Close()
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	return io.Copy(z, resp.Body)
 }
 
 func timeRange(starts, ends time.Time, step time.Duration, fn TimeFunc) error {
