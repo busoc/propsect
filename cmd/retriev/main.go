@@ -33,6 +33,7 @@ func main() {
 		dtstart  = NewDate(-7 * Day)
 		dtend    = NewDate(1)
 		secure   = flag.Bool("https", false, "https")
+		flat     = flag.Bool("flat", false, "put data in flat files instead of tar")
 		remote   = flag.String("r", "localhost:8090", "remote host (host:port)")
 		instance = flag.String("i", "demo", "instance")
 		user     = flag.String("u", "user", "username")
@@ -56,13 +57,13 @@ func main() {
 	switch strings.ToLower(*archive) {
 	case "", "parameters":
 		u.Path = fmt.Sprintf(APIP, *instance)
-		err = retrParameters(u, *minify, dtstart.Time.UTC(), dtend.Time.UTC(), flag.Arg(0), flag.Arg(1))
+		err = retrParameters(u, *minify, *flat, dtstart.Time.UTC(), dtend.Time.UTC(), flag.Arg(0), flag.Arg(1))
 	case "events":
 		u.Path = fmt.Sprintf(APIE, *instance)
-		err = retrEvents(u, *minify, dtstart.Time.UTC(), dtend.Time.UTC(), flag.Arg(0))
+		err = retrEvents(u, *minify, *flat, dtstart.Time.UTC(), dtend.Time.UTC(), flag.Arg(0))
 	case "commands":
 		u.Path = fmt.Sprintf(APIC, *instance)
-		err = retrCommands(u, *minify, dtstart.Time.UTC(), dtend.Time.UTC(), flag.Arg(0))
+		err = retrCommands(u, *minify, *flat, dtstart.Time.UTC(), dtend.Time.UTC(), flag.Arg(0))
 	default:
 		err = fmt.Errorf("%s: unknown archive type", *archive)
 		os.Exit(2)
@@ -200,7 +201,7 @@ func (r Request) isText() bool {
 	return r.format == fmtText || r.format == fmtCsv
 }
 
-func retrParameters(api url.URL, mini bool, dtstart, dtend time.Time, base, dir string) error {
+func retrParameters(api url.URL, mini, flat bool, dtstart, dtend time.Time, base, dir string) error {
 	base = filepath.Clean(base)
 	return filepath.Walk(base, func(file string, i os.FileInfo, err error) error {
 		if err != nil || i.IsDir() {
@@ -215,22 +216,22 @@ func retrParameters(api url.URL, mini bool, dtstart, dtend time.Time, base, dir 
 		}
 		dst, err := mkdir(base, flag.Arg(1), file)
 		if err == nil {
-			req := TextRequest(api, body, mini)
-			err = fetchData(dst, req, dtstart, dtend)
+			req := CsvRequest(api, body, mini)
+			err = fetchData(dst, flat, req, dtstart, dtend)
 		}
 		return err
 	})
 }
 
-func retrCommands(api url.URL, mini bool, dtstart, dtend time.Time, dir string) error {
-	return fetchData(dir, JsonRequest(api, nil, mini), dtstart, dtend)
+func retrCommands(api url.URL, mini, flat bool, dtstart, dtend time.Time, dir string) error {
+	return fetchData(dir, flat, JsonRequest(api, nil, mini), dtstart, dtend)
 }
 
-func retrEvents(api url.URL, mini bool, dtstart, dtend time.Time, dir string) error {
-	return fetchData(dir, TextRequest(api, nil, mini), dtstart, dtend)
+func retrEvents(api url.URL, mini, flat bool, dtstart, dtend time.Time, dir string) error {
+	return fetchData(dir, flat, TextRequest(api, nil, mini), dtstart, dtend)
 }
 
-func fetchData(dir string, req Request, starts, ends time.Time) error {
+func fetchData(dir string, flat bool, req Request, starts, ends time.Time) error {
 	if ends.Before(starts) {
 		return fmt.Errorf("invalid interval")
 	}
@@ -238,13 +239,32 @@ func fetchData(dir string, req Request, starts, ends time.Time) error {
 		var (
 			year = fmt.Sprintf("%04d", when.Year())
 			doy  = fmt.Sprintf("%03d", when.YearDay())
-			file = filepath.Join(dir, year, doy) + ".tar"
+			file = filepath.Join(dir, year, doy)
 		)
-		return create(file, req, when)
+		if flat {
+			return createFile(file+req.Ext(), req, when, when.Add(Day))
+		}
+		return createArchive(file+".tar", req, when)
 	})
 }
 
-func create(file string, req Request, when time.Time) error {
+func createFile(file string, req Request, starts, ends time.Time) error {
+	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+		return err
+	}
+	w, err := os.Create(file)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+	log.Printf("begin writting %s", file)
+	defer log.Printf("end writting %s", file)
+
+	_, err = req.Copy(w, starts, ends)
+	return err
+}
+
+func createArchive(file string, req Request, when time.Time) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}

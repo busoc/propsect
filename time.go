@@ -10,9 +10,24 @@ import (
 const (
 	HadockTime = "hadock"
 	RTTime     = "rt"
+	TarTime    = "tar"
+	LogsTime   = "clog"
 )
 
 type TimeFunc func(string) time.Time
+
+func TimeConsoleLogs(file sting) time.Time {
+	return time.Time{}
+}
+
+func TimeTar(file string) time.Time {
+	var (
+		doy  = strings.TrimSuffix(filepath.Base(file), ".tar")
+		year = filepath.Base(filepath.Dir(file))
+	)
+	w, _ := time.Parse("2006/002", fmt.Sprintf("%s/%s", year, doy))
+	return w
+}
 
 func TimeRT(file string) time.Time {
 	var (
