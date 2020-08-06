@@ -2,18 +2,23 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/midbel/toml"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
 var ErrMismatched = errors.New("checksum mismatched")
@@ -61,14 +66,29 @@ func (c *Client) Copy(d Directory) error {
 		if err != nil {
 			return err
 		}
-		defer r.Close()
+		defer func(file string) {
+			r.Close()
+			if !d.Keep {
+				os.Remove(file)
+			}
+		}(file)
 
-		file = filepath.Join(remote, strings.TrimPrefix(local, file))
-		if j, err := c.client.Stat(file); err == nil && !i.IsDir() {
-			if i.Size() == j.Size() && i.ModTime().Equal(j.ModTime()) {
+		rfile := filepath.Join(remote, strings.TrimPrefix(file, local))
+		log.Printf("begin transfer file: %s -> %s", file, rfile)
+		if j, err := c.client.Stat(rfile); err == nil && !i.IsDir() {
+			var (
+				mtime = i.ModTime().Truncate(time.Second)
+				rtime = j.ModTime().Truncate(time.Second)
+			)
+			if i.Size() == j.Size() && mtime.Equal(rtime) {
+				log.Printf("skip transfer file: %s", file)
 				return nil
 			}
 		}
+		if err := c.copy(r, i, rfile); err != nil {
+			log.Printf("error transfer file: %s -> %s: %s", file, rfile, err)
+		}
+		log.Printf("end transfer file: %s -> %s", file, rfile)
 		return c.copy(r, i, file)
 	})
 }
@@ -105,12 +125,14 @@ func (c *Client) Close() error {
 type Directory struct {
 	Local  string
 	Remote string
+	Keep   bool
 }
 
 func main() {
 	flag.Parse()
 
 	c := struct {
+		Jobs int64
 		Credential
 		Directories []Directory `toml:"directory"`
 	}{}
@@ -118,16 +140,55 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	client, err := c.Connect()
+
+	var err error
+	if c.Jobs <= 1 {
+		err = singleJob(c.Credential, c.Directories)
+	} else {
+		err = multiJobs(c.Credential, c.Directories, c.Jobs)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+		os.Exit(1)
+	}
+}
+
+func multiJobs(c Credential, dirs []Directory, jobs int64) error {
+	var (
+		ctx  = context.TODO()
+		sema = semaphore.NewWeighted(jobs)
+		grp  errgroup.Group
+	)
+	defer sema.Acquire(ctx, jobs)
+	for i := range dirs {
+		if err := sema.Acquire(ctx, 1); err != nil {
+			return err
+		}
+		d := dirs[i]
+		grp.Go(func() error {
+			defer sema.Release(1)
+			client, err := c.Connect()
+			if err != nil {
+				return err
+			}
+			defer client.Close()
+			return client.Copy(d)
+		})
+	}
+	return grp.Wait()
+}
+
+func singleJob(c Credential, dirs []Directory) error {
+	client, err := c.Connect()
+	if err != nil {
+		return err
 	}
 	defer client.Close()
 
-	for _, d := range c.Directories {
+	for _, d := range dirs {
 		if err := client.Copy(d); err != nil {
-			fmt.Fprintf(os.Stderr, "fail to copy from %s to %s: %v", d.Local, d.Remote, err)
+			return fmt.Errorf("fail to copy from %s to %s: %v", d.Local, d.Remote, err)
 		}
 	}
+	return nil
 }
