@@ -22,8 +22,8 @@ import (
 )
 
 var (
-  ErrMismatched = errors.New("checksum mismatched")
-  ErrSize       = errors.New("size mismatched")
+	ErrMismatched = errors.New("checksum mismatched")
+	ErrSize       = errors.New("size mismatched")
 )
 
 type Credential struct {
@@ -88,21 +88,22 @@ func (c *Client) Copy(d Directory) error {
 				return nil
 			}
 		}
-		if err := c.copy(r, i, rfile); err != nil {
+		n, err := c.copy(r, i, rfile)
+    if err != nil {
 			log.Printf("error transfer file: %s -> %s: %s", file, rfile, err)
 		}
-		log.Printf("end transfer file: %s -> %s", file, rfile)
-		return c.copy(r, i, rfile)
+		log.Printf("end transfer file: %s -> %s (%d bytes)", file, rfile, n)
+		return nil
 	})
 }
 
-func (c *Client) copy(r io.Reader, i os.FileInfo, file string) error {
+func (c *Client) copy(r io.Reader, i os.FileInfo, file string) (int64, error) {
 	if err := c.client.MkdirAll(filepath.Dir(file)); err != nil {
-		return err
+		return 0, err
 	}
 	w, err := c.client.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer func() {
 		w.Close()
@@ -113,16 +114,16 @@ func (c *Client) copy(r io.Reader, i os.FileInfo, file string) error {
 		remote = md5.New()
 	)
 	n, err := io.Copy(io.MultiWriter(w, remote), io.TeeReader(r, local))
-  if err != nil {
-		return err
+	if err != nil {
+		return n, err
 	}
-  if z := i.Size(); n != z {
-    return fmt.Errorf("%w: %d - %d", ErrSize, z, n)
-  }
+	if z := i.Size(); n != z {
+		return n, fmt.Errorf("%w: %d - %d", ErrSize, z, n)
+	}
 	if c1, c2 := local.Sum(nil), remote.Sum(nil); !bytes.Equal(c1[:], c2[:]) {
-		return fmt.Errorf("%w: %x - %x", ErrMismatched, c1, c2)
+		return n, fmt.Errorf("%w: %x - %x", ErrMismatched, c1, c2)
 	}
-	return nil
+	return n, nil
 }
 
 func (c *Client) Close() error {
