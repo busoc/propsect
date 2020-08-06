@@ -67,7 +67,7 @@ func (m *module) Process() (prospect.FileInfo, error) {
 		i.Integrity = m.cfg.Integrity
 		i.Level = m.cfg.Level
 	} else {
-		if !errros.Is(err, prospect.ErrSkip) {
+		if !errors.Is(err, prospect.ErrSkip) {
 			err = fmt.Errorf("%s: %s", file, err)
 		}
 	}
