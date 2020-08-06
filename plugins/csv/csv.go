@@ -22,6 +22,8 @@ type module struct {
 	buf    []byte
 	digest hash.Hash
 	source *glob.Glob
+
+	timefn prospect.TimeFunc
 }
 
 func New(cfg prospect.Config) (prospect.Module, error) {
@@ -35,6 +37,7 @@ func New(cfg prospect.Config) (prospect.Module, error) {
 	if err == nil {
 		m.source = g
 	}
+	m.timefn, err = cfg.GetTimeFunc()
 	return &m, err
 }
 
@@ -95,7 +98,11 @@ func (m *module) process(file string) (prospect.FileInfo, error) {
 	}
 
 	if s, err := r.Stat(); err == nil {
-		i.AcqTime = s.ModTime()
+		if m.timefn != nil {
+			i.AcqTime = m.timefn(file)
+		} else {
+			i.AcqTime = s.ModTime().UTC()
+		}
 		i.ModTime = s.ModTime()
 
 		p := prospect.MakeParameter(prospect.FileSize, fmt.Sprintf("%d", s.Size()))
