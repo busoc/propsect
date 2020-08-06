@@ -88,7 +88,7 @@ func (m *module) process(file string) (prospect.FileInfo, error) {
 		return i, err
 	}
 	if records == 0 {
-		return prospect.ErrSkip
+		return i, prospect.ErrSkip
 	}
 	i.File = file
 	i.Parameters = []prospect.Parameter{
