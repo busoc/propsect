@@ -89,7 +89,7 @@ func (m *module) process(file string) (prospect.FileInfo, error) {
 	}
 	i.File = file
 	i.Parameters = []prospect.Parameter{
-		prospect.MakeParameter(prospect.FileDuration, "300s"),
+		//prospect.MakeParameter(prospect.FileDuration, "300s"),
 		prospect.MakeParameter(prospect.FileRecords, fmt.Sprintf("%d", records)),
 	}
 	for j, h := range headers {

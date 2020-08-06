@@ -1,6 +1,7 @@
 package prospect
 
 import (
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -16,7 +17,7 @@ const (
 
 type TimeFunc func(string) time.Time
 
-func TimeConsoleLogs(file sting) time.Time {
+func TimeConsoleLogs(file string) time.Time {
 	return time.Time{}
 }
 
