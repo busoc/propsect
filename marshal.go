@@ -11,10 +11,12 @@ import (
 	"time"
 )
 
+const metadir = "metadata"
+
 type marshaler interface {
 	copyFile(string, Data) error
 
-	marshalData(Data) error
+	marshalData(Data, bool) error
 	marshalMeta(Meta) error
 }
 
@@ -84,8 +86,13 @@ func (b *filebuilder) copyFile(file string, d Data) error {
 	}
 }
 
-func (b *filebuilder) marshalData(d Data) error {
-	file := filepath.Join(b.rootdir, d.Info.File)
+func (b *filebuilder) marshalData(d Data, samedir bool) error {
+	// file := filepath.Join(b.rootdir, d.Info.File)
+	file := b.rootdir
+	if !samedir {
+		file = filepath.Join(file, metadir)
+	}
+	file = filepath.Join(file, d.Info.File)
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
@@ -146,9 +153,13 @@ func (b *zipbuilder) copyFile(file string, d Data) error {
 	return err
 }
 
-func (b *zipbuilder) marshalData(d Data) error {
+func (b *zipbuilder) marshalData(d Data, samedir bool) error {
+	file := d.Info.File + ".xml"
+	if !samedir {
+		file = filepath.Join(metadir, file)
+	}
 	fh := zip.FileHeader{
-		Name:     d.Info.File + ".xml",
+		Name:     file,
 		Modified: d.Info.AcqTime,
 	}
 	w, err := b.writer.CreateHeader(&fh)

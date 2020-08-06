@@ -29,8 +29,9 @@ type Builder struct {
 	modules  []Config
 	schedule Schedule
 
-	path   string
-	dryrun bool
+	path    string
+	dryrun  bool
+	samedir bool
 
 	marshaler
 }
@@ -39,6 +40,7 @@ func NewBuilder(file, schedule string) (*Builder, error) {
 	c := struct {
 		Archive string
 		Dry     bool `toml:"no-data"`
+		Same    bool `toml:"same-dir"`
 		Path    string
 		Link    string
 
@@ -59,6 +61,7 @@ func NewBuilder(file, schedule string) (*Builder, error) {
 
 	b := Builder{
 		dryrun:    c.Dry,
+		samedir:   c.Same,
 		path:      c.Path,
 		meta:      c.Meta,
 		data:      c.Data,
@@ -160,7 +163,7 @@ func (b *Builder) build(mod Module, cfg Config) error {
 			original := x.Info.File
 			x.Info.File = filepath.Join(resolve.Resolve(x), filepath.Base(x.Info.File))
 
-			if err := b.marshalData(x); err != nil {
+			if err := b.marshalData(x, b.samedir); err != nil {
 				return err
 			}
 			if b.dryrun {
@@ -264,7 +267,7 @@ func (b *Builder) buildArchive(db *bolt.DB) error {
 			if file := bfs.Get(key); file != nil {
 				d.Info.File = string(file)
 			}
-			if err := b.marshalData(d); err != nil {
+			if err := b.marshalData(d, b.samedir); err != nil {
 				return err
 			}
 			if b.dryrun {
