@@ -76,10 +76,12 @@ func (c Config) GuessType(ext string) (string, string) {
 func (c Config) GetTimeFunc() (TimeFunc, error) {
 	var fn TimeFunc
 	switch strings.ToLower(c.AcqTime) {
-	case "hadock":
+	case HadockTime:
 		fn = TimeHadock
-	case "rt":
+	case RTTime:
 		fn = TimeRT
+	case FlatTime:
+		fn = TimeFlat
 	case "":
 	default:
 		return nil, fmt.Errorf("unsupported acqtime: %s", c.AcqTime)

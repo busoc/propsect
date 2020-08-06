@@ -10,7 +10,7 @@ import (
 const (
 	HadockTime = "hadock"
 	RTTime     = "rt"
-	TarTime    = "tar"
+	FlatTime   = "Flat"
 	LogsTime   = "clog"
 )
 
@@ -20,9 +20,19 @@ func TimeConsoleLogs(file sting) time.Time {
 	return time.Time{}
 }
 
-func TimeTar(file string) time.Time {
+func TimeFlat(file string) time.Time {
+	trimExt := func(f string) string {
+		for {
+			e := filepath.Ext(f)
+			if e == "" {
+				break
+			}
+			f = strings.TrimSuffix(f, e)
+		}
+		return f
+	}
 	var (
-		doy  = strings.TrimSuffix(filepath.Base(file), ".tar")
+		doy  = trimExt(filepath.Base(file))
 		year = filepath.Base(filepath.Dir(file))
 	)
 	w, _ := time.Parse("2006/002", fmt.Sprintf("%s/%s", year, doy))

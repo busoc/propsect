@@ -8,7 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-  "io/ioutil"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -138,12 +138,12 @@ type Directory struct {
 }
 
 func main() {
-  quiet := flag.Bool("q", false, "quiet")
+	quiet := flag.Bool("q", false, "quiet")
 	flag.Parse()
 
-  if *quiet {
-    log.SetOutput(ioutil.Discard)
-  }
+	if *quiet {
+		log.SetOutput(ioutil.Discard)
+	}
 
 	c := struct {
 		Jobs int64
