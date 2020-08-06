@@ -89,7 +89,7 @@ func (c *Client) Copy(d Directory) error {
 			log.Printf("error transfer file: %s -> %s: %s", file, rfile, err)
 		}
 		log.Printf("end transfer file: %s -> %s", file, rfile)
-		return c.copy(r, i, file)
+		return c.copy(r, i, rfile)
 	})
 }
 
