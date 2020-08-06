@@ -142,6 +142,13 @@ func (f fragment) Resolve(dat Data) string {
 	var str string
 	switch strings.ToLower(f.name) {
 	default:
+		if x, err := strconv.Atoi(f.name); err == nil {
+			xs := strings.Split(strings.TrimPrefix(dat.Info.File, "/"), "/")
+			x--
+			if x < len(xs) {
+				str = xs[x]
+			}
+		}
 		// str = "unknown"
 	case levelLevel:
 		str = strconv.Itoa(dat.Level)
