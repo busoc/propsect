@@ -167,9 +167,8 @@ func (i index) Resolve(dat Data) string {
 		xs  = strings.Split(strings.TrimPrefix(dir, "/"), "/")
 		str string
 	)
-	x := i.index - 1
-	if x < len(xs) {
-		str = xs[x]
+	if i.index < len(xs) {
+		str = xs[i.index]
 	}
 	return str
 }
@@ -206,7 +205,7 @@ func (i slice) String() string {
 
 func normalize(index, size int) int {
 	if index < 0 {
-		index = size - 1 + index
+		index = size + index
 	}
 	if index < 0 {
 		index = 0
