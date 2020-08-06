@@ -21,7 +21,10 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-var ErrMismatched = errors.New("checksum mismatched")
+var (
+  ErrMismatched = errors.New("checksum mismatched")
+  ErrSize       = errors.New("size mismatched")
+)
 
 type Credential struct {
 	Addr   string
@@ -109,9 +112,13 @@ func (c *Client) copy(r io.Reader, i os.FileInfo, file string) error {
 		local  = md5.New()
 		remote = md5.New()
 	)
-	if _, err := io.Copy(io.MultiWriter(w, remote), io.TeeReader(r, local)); err != nil {
+	n, err := io.Copy(io.MultiWriter(w, remote), io.TeeReader(r, local))
+  if err != nil {
 		return err
 	}
+  if z := i.Size(); n != z {
+    return fmt.Errorf("%w: %d - %d", ErrSize, z, n)
+  }
 	if c1, c2 := local.Sum(nil), remote.Sum(nil); !bytes.Equal(c1[:], c2[:]) {
 		return fmt.Errorf("%w: %x - %x", ErrMismatched, c1, c2)
 	}
