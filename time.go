@@ -11,7 +11,7 @@ import (
 const (
 	HadockTime = "hadock"
 	RTTime     = "rt"
-	FlatTime   = "Flat"
+	FlatTime   = "flat"
 	LogsTime   = "clog"
 )
 

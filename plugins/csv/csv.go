@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"encoding/csv"
 	"fmt"
 	"hash"
@@ -66,7 +67,9 @@ func (m *module) Process() (prospect.FileInfo, error) {
 		i.Integrity = m.cfg.Integrity
 		i.Level = m.cfg.Level
 	} else {
-		err = fmt.Errorf("%s: %s", file, err)
+		if !errros.Is(err, prospect.ErrSkip) {
+			err = fmt.Errorf("%s: %s", file, err)
+		}
 	}
 	return i, err
 }
