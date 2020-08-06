@@ -87,6 +87,9 @@ func (m *module) process(file string) (prospect.FileInfo, error) {
 	if err != nil {
 		return i, err
 	}
+	if records == 0 {
+		return prospect.ErrSkip
+	}
 	i.File = file
 	i.Parameters = []prospect.Parameter{
 		//prospect.MakeParameter(prospect.FileDuration, "300s"),
