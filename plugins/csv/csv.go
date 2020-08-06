@@ -1,8 +1,8 @@
 package main
 
 import (
-	"errors"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"hash"
 	"io"

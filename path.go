@@ -29,6 +29,7 @@ func Parse(str string) (resolver, error) {
 const (
 	lcurly = '{'
 	rcurly = '}'
+	colon  = ':'
 )
 
 const (
@@ -70,8 +71,13 @@ func parse(str string) (resolver, error) {
 			rs = append(rs, literal(q))
 		}
 		offset += start + 1
+		// rs = append(rs, fragment{name: str[offset : offset+end-1]})
+		r, err := parseResolver(str[offset : offset+end-1])
+		if err != nil {
+			return nil, err
+		}
+		rs = append(rs, r)
 
-		rs = append(rs, fragment{name: str[offset : offset+end-1]})
 		offset += end
 	}
 
@@ -83,6 +89,27 @@ func parse(str string) (resolver, error) {
 		return rs[0], nil
 	}
 	return compound{rs: rs}, nil
+}
+
+func parseResolver(str string) (resolver, error) {
+	var err error
+	if !(isNumber(str[0]) || isSign(str[0])) {
+		return fragment{name: str}, err
+	}
+	x := strings.IndexByte(str, colon)
+	if x < 0 {
+		var i index
+		i.index, err = strconv.Atoi(str)
+		return i, err
+	}
+	var i slice
+	if i.begin, err = strconv.Atoi(str[:x]); err != nil {
+		return nil, err
+	}
+	if i.end, err = strconv.Atoi(str[x+1:]); err != nil {
+		return nil, err
+	}
+	return i, err
 }
 
 type resolver interface {
@@ -130,6 +157,73 @@ func (i literal) String() string {
 	return fmt.Sprintf("literal(%s)", string(i))
 }
 
+type index struct {
+	index int
+}
+
+func (i index) Resolve(dat Data) string {
+	var (
+		dir = filepath.Dir(dat.Info.File)
+		xs  = strings.Split(strings.TrimPrefix(dir, "/"), "/")
+		str string
+	)
+	x := i.index - 1
+	if x < len(xs) {
+		str = xs[x]
+	}
+	return str
+}
+
+func (i index) String() string {
+	return fmt.Sprintf("index(%d)", i.index)
+}
+
+type slice struct {
+	begin int
+	end   int
+}
+
+func (i slice) Resolve(dat Data) string {
+	var (
+		dir   = filepath.Dir(dat.Info.File)
+		xs    = strings.Split(strings.TrimPrefix(dir, "/"), "/")
+		begin = normalize(i.begin, len(xs))
+		end   = normalize(i.end, len(xs))
+		str   string
+	)
+	switch {
+	case end == begin:
+		str = xs[begin]
+	case end > begin:
+		str = filepath.Join(xs[begin:end]...)
+	}
+	return str
+}
+
+func (i slice) String() string {
+	return fmt.Sprintf("range(%d:%d)", i.begin, i.end)
+}
+
+func normalize(index, size int) int {
+	if index < 0 {
+		index = size - 1 + index
+	}
+	if index < 0 {
+		index = 0
+	} else if index >= size {
+		index = size
+	}
+	return index
+}
+
+func isNumber(char byte) bool {
+	return (char >= '0' && char <= '9')
+}
+
+func isSign(char byte) bool {
+	return char == '-'
+}
+
 type fragment struct {
 	name string
 }
@@ -143,7 +237,10 @@ func (f fragment) Resolve(dat Data) string {
 	switch strings.ToLower(f.name) {
 	default:
 		if x, err := strconv.Atoi(f.name); err == nil {
-			xs := strings.Split(strings.TrimPrefix(dat.Info.File, "/"), "/")
+			var (
+				dir = filepath.Dir(f.name)
+				xs  = strings.Split(strings.TrimPrefix(dir, "/"), "/")
+			)
 			x--
 			if x < len(xs) {
 				str = xs[x]
