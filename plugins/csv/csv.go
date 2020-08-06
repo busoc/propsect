@@ -11,6 +11,7 @@ import (
 
 	"github.com/busoc/prospect"
 	"github.com/midbel/glob"
+	"github.com/midbel/mime"
 )
 
 const (
@@ -86,7 +87,7 @@ func (m *module) process(file string) (prospect.FileInfo, error) {
 		m.digest.Reset()
 	}()
 
-	headers, records, err := m.readFile(r)
+	headers, records, err := m.readFile(r, m.cfg.Mime)
 	if err != nil {
 		return i, err
 	}
@@ -118,11 +119,26 @@ func (m *module) process(file string) (prospect.FileInfo, error) {
 	return i, nil
 }
 
-func (m *module) readFile(r io.Reader) ([]string, int, error) {
+func (m *module) readFile(r io.Reader, str string) ([]string, int, error) {
 	var (
 		rs   = csv.NewReader(io.TeeReader(r, m.digest))
 		rows int
 	)
+	mt, err := mime.Parse(str)
+	if err != nil {
+		return nil, 0, err
+	}
+	switch mt.Params["delimiter"] {
+	case "tab", "\t":
+		rs.Comma = '\t'
+	case "comma", ",":
+		rs.Comma = ','
+	case "space", " ":
+		rs.Comma = ' '
+	case "pipe", "|":
+		rs.Comma = '|'
+	default:
+	}
 	hd, err := rs.Read()
 	if err != nil {
 		return nil, 0, err
