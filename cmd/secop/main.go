@@ -83,14 +83,16 @@ func (c *Client) Copy(d Directory) error {
 
 		rfile := filepath.Join(remote, strings.TrimPrefix(file, local))
 		log.Printf("begin transfer file: %s -> %s", file, rfile)
-		if j, err := c.client.Stat(rfile); err == nil && !i.IsDir() {
-			var (
-				mtime = i.ModTime().Truncate(time.Second)
-				rtime = j.ModTime().Truncate(time.Second)
-			)
-			if i.Size() == j.Size() && mtime.Equal(rtime) {
-				log.Printf("skip transfer file: %s", file)
-				return nil
+		if !d.Force {
+			if j, err := c.client.Stat(rfile); err == nil && !i.IsDir() {
+				var (
+					mtime = i.ModTime().Truncate(time.Second)
+					rtime = j.ModTime().Truncate(time.Second)
+				)
+				if i.Size() == j.Size() && mtime.Equal(rtime) {
+					log.Printf("skip transfer file: %s", file)
+					return nil
+				}
 			}
 		}
 		n, err := c.copy(r, i, rfile, d.Compress)
@@ -150,6 +152,7 @@ type Directory struct {
 	Local  string
 	Remote string
 	Keep   bool
+	Force  bool
 	Compress bool
 }
 
