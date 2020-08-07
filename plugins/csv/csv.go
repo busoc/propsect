@@ -89,11 +89,14 @@ func (m *module) process(file string) (prospect.FileInfo, error) {
 
 	headers, records, err := m.readFile(r, m.cfg.Mime)
 	if err != nil {
+		if err == io.EOF {
+			err = prospect.ErrSkip
+		}
 		return i, err
 	}
-	if records == 0 {
-		return i, prospect.ErrSkip
-	}
+	//if records == 0 {
+	//	return i, prospect.ErrSkip
+	//}
 	i.File = file
 	i.Parameters = []prospect.Parameter{
 		//prospect.MakeParameter(prospect.FileDuration, "300s"),
