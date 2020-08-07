@@ -59,7 +59,7 @@ type filebuilder struct {
 
 func (b *filebuilder) copyFile(file string, d Data) error {
 	newfile := filepath.Join(b.rootdir, d.Info.File)
-	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(newfile), 0755); err != nil {
 		return err
 	}
 	defer fmt.Fprintln(os.Stderr, file, newfile)
