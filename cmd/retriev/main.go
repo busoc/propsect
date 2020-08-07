@@ -214,7 +214,7 @@ func retrParameters(api url.URL, mini, flat bool, dtstart, dtend time.Time, base
 		if err != nil {
 			return err
 		}
-		dst, err := mkdir(base, flag.Arg(1), file)
+		dst, err := mkdir(base, dir, file)
 		if err == nil {
 			req := CsvRequest(api, body, mini)
 			err = fetchData(dst, flat, req, dtstart, dtend)
