@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/md5"
 	"errors"
@@ -59,9 +60,12 @@ type Client struct {
 
 func (c *Client) Copy(d Directory) error {
 	var (
-		local  = filepath.Clean(d.Local)
-		remote = filepath.Clean(d.Remote)
+		local  = filepath.Clean(strings.TrimSpace(d.Local))
+		remote = filepath.Clean(strings.TrimSpace(d.Remote))
 	)
+	if remote == "=" {
+		remote = local
+	}
 	return filepath.Walk(d.Local, func(file string, i os.FileInfo, err error) error {
 		if err != nil || i.IsDir() {
 			return err
@@ -89,7 +93,7 @@ func (c *Client) Copy(d Directory) error {
 				return nil
 			}
 		}
-		n, err := c.copy(r, i, rfile)
+		n, err := c.copy(r, i, rfile, d.Compress)
 		if err != nil {
 			log.Printf("error transfer file: %s -> %s: %s", file, rfile, err)
 		}
@@ -98,18 +102,29 @@ func (c *Client) Copy(d Directory) error {
 	})
 }
 
-func (c *Client) copy(r io.Reader, i os.FileInfo, file string) (int64, error) {
+func (c *Client) copy(r io.Reader, i os.FileInfo, file string, minify bool) (int64, error) {
+	if minify {
+		file += ".gz"
+	}
 	if err := c.client.MkdirAll(filepath.Dir(file)); err != nil {
 		return 0, err
 	}
-	w, err := c.client.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
-	if err != nil {
+	var w io.Writer
+	if f, err := c.client.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC); err != nil {
 		return 0, err
+	} else {
+		w = f
+		defer func() {
+			f.Close()
+			c.client.Chtimes(file, i.ModTime(), i.ModTime())
+			}()
 	}
-	defer func() {
-		w.Close()
-		c.client.Chtimes(file, i.ModTime(), i.ModTime())
-	}()
+	if minify {
+		z, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
+		defer z.Close()
+
+		w = z
+	}
 	var (
 		local  = md5.New()
 		remote = md5.New()
@@ -135,6 +150,7 @@ type Directory struct {
 	Local  string
 	Remote string
 	Keep   bool
+	Compress bool
 }
 
 func main() {
