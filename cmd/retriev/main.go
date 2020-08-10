@@ -191,8 +191,11 @@ func (r Request) Make(starts, ends time.Time) (*http.Request, error) {
 	}
 
 	req, err := http.NewRequest(method, r.api.String(), bytes.NewReader(r.body))
-	if err == nil && r.isText() {
-		req.Header.Set("accept", "text/csv")
+	if err == nil {
+		req.Header.Set("accept-encoding", "identity")
+		if r.isText() {
+			req.Header.Set("accept", "text/csv")
+		}
 	}
 	return req, err
 }
