@@ -24,20 +24,21 @@ func runMonitor(cmd *cli.Command, args []string) error {
 	defer rc.Close()
 
 	var (
-		curr State
+		state State
 		file string
 		bar  *wip.Bar
 	)
 	for {
-		if err := binary.Read(rc, binary.BigEndian, &curr); err != nil {
+		if err := binary.Read(rc, binary.BigEndian, &state); err != nil {
 			return err
 		}
-		if file == "" || file != curr.Filename() {
+		name := state.Filename()
+		if file == "" || file != name {
       fmt.Println()
-			bar = wip.Default(filepath.Base(curr.Filename()), curr.Size)
+			bar = MakeBar(filepath.Base(name), state.Size)
 		}
-		file = curr.Filename()
-		bar.Update(curr.Curr)
+		file = name
+		bar.Update(state.Curr)
 	}
 	return nil
 }
@@ -103,4 +104,16 @@ func (r *Reader) Close() error {
 		err = e
 	}
 	return err
+}
+
+func MakeBar(file string, size int64) *wip.Bar {
+	options := []wip.Option{
+		wip.WithSpace('-'),
+		wip.WithFill('='),
+		wip.WithWidth(20),
+		wip.WithLabel(file),
+		wip.WithIndicator(wip.Rate),
+	}
+	b, _ := wip.New(size, options...)
+	return b
 }
