@@ -17,7 +17,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-const DefaultBufferSize = 1024
+const DefaultBufferSize = 1<<15
 
 type Directory struct {
 	Local     string
@@ -116,7 +116,7 @@ func (c *Client) Copy(d Directory, buffer int64) error {
 				}
 			}
 		}
-		n, err := c.copy(r, i, rfile, d.Compress, buf)
+		n, err := c.copy(r, i, rfile, d.Compress, d.Integrity, buf)
 		if err != nil {
 			log.Printf("error transfer file: %s -> %s: %s", file, rfile, err)
 		}
@@ -126,7 +126,7 @@ func (c *Client) Copy(d Directory, buffer int64) error {
 	return err
 }
 
-func (c *Client) copy(r io.Reader, i os.FileInfo, file string, minify bool, buffer []byte) (int64, error) {
+func (c *Client) copy(r io.Reader, i os.FileInfo, file string, minify, integrity bool, buffer []byte) (int64, error) {
 	if minify {
 		file += ".gz"
 	}
@@ -165,7 +165,12 @@ func (c *Client) copy(r io.Reader, i os.FileInfo, file string, minify bool, buff
 		local  = md5.New()
 		remote = md5.New()
 	)
-	n, err := io.CopyBuffer(io.MultiWriter(w, remote), io.TeeReader(rs, local), buffer)
+	if integrity {
+		rs = io.TeeReader(rs, local)
+		w = io.MultiWriter(w, remote)
+	}
+
+	n, err := io.CopyBuffer(w, rs, buffer)
 	if err != nil {
 		return n, err
 	}
