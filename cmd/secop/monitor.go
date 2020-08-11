@@ -112,7 +112,7 @@ func MakeBar(file string, size int64) *wip.Bar {
 		wip.WithFill('='),
 		wip.WithWidth(20),
 		wip.WithLabel(file),
-		wip.WithIndicator(wip.Rate),
+		wip.WithIndicator(wip.Percent),
 	}
 	b, _ := wip.New(size, options...)
 	return b
