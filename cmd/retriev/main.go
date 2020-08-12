@@ -18,6 +18,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/midbel/try"
 )
 
 const (
@@ -25,7 +27,10 @@ const (
 	APIE = "/api/archive/%s/downloads/events/"
 	APIC = "/api/archive/%s/commands"
 )
-const Day = time.Hour * 24
+const (
+	Day = time.Hour * 24
+	MaxAttempt = 10
+)
 
 // retr [-r remote] [-i instance] [-f from] [-t to] <listing dir> <archive dir>
 func main() {
@@ -204,6 +209,10 @@ func (r Request) isText() bool {
 	return r.format == fmtText || r.format == fmtCsv
 }
 
+func (r Request) String() string {
+	return r.api.String()
+}
+
 func retrParameters(api url.URL, mini, flat bool, dtstart, dtend time.Time, base, dir string) error {
 	base = filepath.Clean(base)
 	return filepath.Walk(base, func(file string, i os.FileInfo, err error) error {
@@ -255,22 +264,10 @@ func createFile(file string, req Request, starts, ends time.Time) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
-	// w, err := os.Create(file)
-	// if err != nil {
-	// 	return err
-	// }
-	// defer w.Close()
 	log.Printf("begin writting %s", file)
 	defer log.Printf("end writting %s", file)
 
-	// _, err = req.Copy(w, starts, ends)
-	return tryRequest(req, file, starts, ends)
-}
-
-const MaxAttempt = 10
-
-func tryRequest(req Request, file string, starts, ends time.Time) error {
-	try := func() error {
+	return try.Try(MaxAttempt, func(i int) error {
 		w, err := os.Create(file)
 		if err != nil {
 			return err
@@ -278,29 +275,11 @@ func tryRequest(req Request, file string, starts, ends time.Time) error {
 		defer w.Close()
 
 		_, err = req.Copy(w, starts, ends)
+		if err != nil {
+			log.Printf("%s: attempt #%d failed: %v", req, i, err)
+		}
 		return err
-	}
-	var (
-		wait  = time.Second * 5
-		limit = time.Second * 30
-		curr  int
-	)
-	for curr < MaxAttempt {
-		err := try()
-		if err == nil {
-			break
-		}
-		log.Printf("%s: attempt #%d fail: %v - wait %s before next attempt", file, curr+1, err, wait)
-		time.Sleep(wait)
-		if wait < limit {
-			wait += time.Second
-		}
-		curr++
-	}
-	if curr >= MaxAttempt {
-		return fmt.Errorf("fail writing to %s: max attempts reached", file)
-	}
-	return nil
+	})
 }
 
 func createArchive(file string, req Request, when time.Time) error {
@@ -328,21 +307,28 @@ func createArchive(file string, req Request, when time.Time) error {
 	}()
 
 	return timeRange(when, when.Add(Day), time.Hour, func(when time.Time) error {
-		time.Sleep(time.Second)
-		rw, err := ioutil.TempFile("", "data*.csv.gz")
-		if err != nil {
-			return err
-		}
-		defer func() {
-			rw.Close()
-			os.Remove(rw.Name())
-		}()
+		return try.Try(MaxAttempt, func(i int) error {
+			rw, err := ioutil.TempFile("", "data*.csv.gz")
+			if err != nil {
+				return err
+			}
+			defer func() {
+				rw.Close()
+				os.Remove(rw.Name())
+			}()
 
-		if size, err := req.Copy(rw, when, when.Add(time.Hour)); err != nil || size == 0 {
-			return err
-		}
-		written++
-		return appendFile(tw, rw, when)
+			if size, err := req.Copy(rw, when, when.Add(time.Hour)); err != nil || size == 0 {
+				if err != nil {
+					log.Printf("%s: attempt #%d failed: %v", req, i, err)
+				}
+				return err
+			}
+			written++
+			if err := appendFile(tw, rw, when); err != nil {
+				return fmt.Errorf("%w: %s", wip.ErrAbort, err)
+			}
+			return nil
+		})
 	})
 }
 
