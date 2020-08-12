@@ -325,7 +325,7 @@ func createArchive(file string, req Request, when time.Time) error {
 			}
 			written++
 			if err := appendFile(tw, rw, when); err != nil {
-				return fmt.Errorf("%w: %s", wip.ErrAbort, err)
+				return fmt.Errorf("%w: %s", try.ErrAbort, err)
 			}
 			return nil
 		})
