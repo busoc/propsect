@@ -22,8 +22,8 @@ func runCopy(cmd *cli.Command, args []string) error {
 	}
 
 	c := struct {
-    Buffer int64
-		Jobs int64
+		Buffer int64
+		Jobs   int64
 		Credential
 		Directories []Directory `toml:"directory"`
 	}{}

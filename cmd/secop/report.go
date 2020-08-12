@@ -14,12 +14,12 @@ type Addr struct {
 }
 
 type State struct {
-	Local  Addr
-	Remote Addr
-	Size   int64
-	Curr   int64
+	Local   Addr
+	Remote  Addr
+	Size    int64
+	Curr    int64
 	Written int64
-	File   [256]byte
+	File    [256]byte
 }
 
 func (s *State) Filename() string {

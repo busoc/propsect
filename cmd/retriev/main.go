@@ -179,23 +179,6 @@ func (r Request) Copy(ws io.Writer, starts, ends time.Time) (int64, error) {
 	return io.Copy(ws, resp.Body)
 }
 
-func (r Request) TryCopy(ws io.Writer, starts, ends time.Time) (int64, error) {
-	var (
-		wait = time.Second
-		limit = time.Second*30
-	)
-	for {
-		n, err := r.Copy(ws, starts, ends)
-		if err == nil {
-			return n, err
-		}
-		time.Sleep(wait)
-		if wait < limit {
-			wait += time.Second
-		}
-	}
-}
-
 func (r Request) Make(starts, ends time.Time) (*http.Request, error) {
 	vs := url.Values{}
 	vs.Set("start", starts.Format(time.RFC3339))
@@ -272,16 +255,52 @@ func createFile(file string, req Request, starts, ends time.Time) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
-	w, err := os.Create(file)
-	if err != nil {
-		return err
-	}
-	defer w.Close()
+	// w, err := os.Create(file)
+	// if err != nil {
+	// 	return err
+	// }
+	// defer w.Close()
 	log.Printf("begin writting %s", file)
 	defer log.Printf("end writting %s", file)
 
-	_, err = req.TryCopy(w, starts, ends)
-	return err
+	// _, err = req.Copy(w, starts, ends)
+	return tryRequest(req, file, starts, ends)
+}
+
+const MaxAttempt = 10
+
+func tryRequest(req Request, file string, starts, ends time.Time) error {
+	try := func() error {
+		w, err := os.Create(file)
+		if err != nil {
+			return err
+		}
+		defer w.Close()
+
+		_, err = req.Copy(w, starts, ends)
+		return err
+	}
+	var (
+		wait  = time.Second * 5
+		limit = time.Second * 30
+		curr  int
+	)
+	for curr < MaxAttempt {
+		err := try()
+		if err == nil {
+			break
+		}
+		log.Printf("%s: attempt #%d fail: %v - wait %s before next attempt", file, curr+1, err, wait)
+		time.Sleep(wait)
+		if wait < limit {
+			wait += time.Second
+		}
+		curr++
+	}
+	if curr >= MaxAttempt {
+		return fmt.Errorf("fail writing to %s: max attempts reached", file)
+	}
+	return nil
 }
 
 func createArchive(file string, req Request, when time.Time) error {
@@ -319,7 +338,7 @@ func createArchive(file string, req Request, when time.Time) error {
 			os.Remove(rw.Name())
 		}()
 
-		if size, err := req.TryCopy(rw, when, when.Add(time.Hour)); err != nil || size == 0 {
+		if size, err := req.Copy(rw, when, when.Add(time.Hour)); err != nil || size == 0 {
 			return err
 		}
 		written++

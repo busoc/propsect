@@ -17,7 +17,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-const DefaultBufferSize = 1<<15
+const DefaultBufferSize = 1 << 15
 
 type Directory struct {
 	Local     string

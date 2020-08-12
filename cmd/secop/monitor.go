@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
-  "path/filepath"
+	"path/filepath"
 
 	"github.com/midbel/cli"
 	"github.com/midbel/wip"
@@ -25,8 +25,8 @@ func runMonitor(cmd *cli.Command, args []string) error {
 
 	var (
 		state State
-		file string
-		bar  *wip.Bar
+		file  string
+		bar   *wip.Bar
 	)
 	for {
 		if err := binary.Read(rc, binary.BigEndian, &state); err != nil {
@@ -34,7 +34,7 @@ func runMonitor(cmd *cli.Command, args []string) error {
 		}
 		name := state.Filename()
 		if file == "" || file != name {
-      fmt.Println()
+			fmt.Println()
 			bar = MakeBar(filepath.Base(name), state.Size)
 		}
 		file = name
