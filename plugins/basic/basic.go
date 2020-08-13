@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"fmt"
 	"hash"
 	"io"
@@ -48,8 +49,6 @@ func (m module) Process() (prospect.FileInfo, error) {
 		return prospect.FileInfo{}, prospect.ErrDone
 	}
 
-	defer m.digest.Reset()
-
 	i, err := m.process(file)
 	if err == nil {
 		i.Mime, i.Type = m.cfg.GuessType(filepath.Ext(file))
@@ -72,9 +71,22 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 	if err != nil {
 		return i, err
 	}
-	defer r.Close()
+	defer func() {
+		r.Close()
+		m.digest.Reset()
+	}()
 
-	if _, err := io.Copy(m.digest, r); err != nil {
+	var rs io.Reader = r
+	if filepath.Ext(file) == ".gz" {
+		r, err := gzip.NewReader(rs)
+		if err != nil {
+			return i, err
+		}
+		defer r.Close()
+		rs = r
+	}
+
+	if _, err := io.Copy(m.digest, rs); err != nil {
 		return i, err
 	}
 	i.File = file

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -87,7 +88,17 @@ func (m *module) process(file string) (prospect.FileInfo, error) {
 		m.digest.Reset()
 	}()
 
-	headers, records, err := m.readFile(r, m.cfg.Mime)
+	var rs io.Reader = r
+	if filepath.Ext(file) == ".gz" {
+		r, err := gzip.NewReader(rs)
+		if err != nil {
+			return i, err
+		}
+		defer r.Close()
+		rs = r
+	}
+
+	headers, records, err := m.readFile(rs, m.cfg.Mime)
 	if err != nil {
 		if err == io.EOF {
 			err = prospect.ErrSkip

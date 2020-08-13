@@ -28,7 +28,7 @@ const (
 	APIC = "/api/archive/%s/commands"
 )
 const (
-	Day = time.Hour * 24
+	Day        = time.Hour * 24
 	MaxAttempt = 10
 )
 

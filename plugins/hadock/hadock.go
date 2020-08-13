@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"bytes"
 	"encoding/binary"
 	"encoding/xml"
@@ -179,10 +180,21 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 		r.Close()
 		m.digest.Reset()
 	}()
-	if s, _ := r.Stat(); err == nil && s.IsDir() {
+	if s, err := r.Stat(); err == nil && s.IsDir() {
 		return i, prospect.ErrSkip
 	}
-	if ps, err := readFile(io.TeeReader(r, m.digest)); err == nil {
+
+	var rs io.Reader = r
+	if filepath.Ext(file) == ".gz" {
+		r, err := gzip.NewReader(rs)
+		if err != nil {
+			return i, err
+		}
+		defer r.Close()
+		rs = r
+	}
+
+	if ps, err := readFile(io.TeeReader(rs, m.digest)); err == nil {
 		i.File = file
 		i.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
 		i.AcqTime = timeFromFile(file)

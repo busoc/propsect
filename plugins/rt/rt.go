@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"fmt"
 	"hash"
 	"io"
@@ -81,7 +82,17 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 		m.digest.Reset()
 	}()
 
-	ps, err := m.readFile(io.TeeReader(rt.NewReader(r), m.digest))
+	var rs io.Reader = r
+	if filepath.Ext(file) == ".gz" {
+		r, err := gzip.NewReader(rs)
+		if err != nil {
+			return i, err
+		}
+		defer r.Close()
+		rs = r
+	}
+
+	ps, err := m.readFile(io.TeeReader(rt.NewReader(rs), m.digest))
 	if err == nil {
 		i.File = file
 		i.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
