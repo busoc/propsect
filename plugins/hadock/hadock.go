@@ -1,8 +1,8 @@
 package main
 
 import (
-	"compress/gzip"
 	"bytes"
+	"compress/gzip"
 	"encoding/binary"
 	"encoding/xml"
 	"fmt"
@@ -185,7 +185,7 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 	}
 
 	var rs io.Reader = r
-	if filepath.Ext(file) == ".gz" {
+	if filepath.Ext(file) == prospect.ExtGZ {
 		r, err := gzip.NewReader(rs)
 		if err != nil {
 			return i, err
@@ -193,6 +193,9 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 		defer r.Close()
 		rs = r
 	}
+
+	c := prospect.NewCounter()
+	rs = io.TeeReader(rs, c)
 
 	if ps, err := readFile(io.TeeReader(rs, m.digest)); err == nil {
 		i.File = file
@@ -221,6 +224,10 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 			ps = append(ps, prospect.MakeParameter(fileScalFar, strconv.Itoa(m.Ratio)))
 		}
 		i.Parameters = append(i.Parameters, ps...)
+		i.Parameters = append(i.Parameters, c.AsParameter())
+		if filepath.Ext(file) == prospect.ExtGZ {
+			i.Parameters = append(i.Parameters, MakeParameter(prospect.FileEncoding), prospect.MimeGZ)
+		}
 	}
 	return i, nil
 }
@@ -245,11 +252,7 @@ func readFile(rs io.Reader) ([]prospect.Parameter, error) {
 		ps = append(ps, prospect.MakeParameter(fileHeight, fmt.Sprintf("%d", y)))
 	}
 
-	n, err := io.Copy(ioutil.Discard, rs)
-	if err == nil {
-		size := int(n) + len(buf)
-		ps = append(ps, prospect.MakeParameter(prospect.FileSize, fmt.Sprintf("%d", size)))
-	}
+	io.Copy(ioutil.Discard, rs)
 	return ps, nil
 }
 

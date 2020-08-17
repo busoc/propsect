@@ -89,7 +89,7 @@ func (m *module) process(file string) (prospect.FileInfo, error) {
 	}()
 
 	var rs io.Reader = r
-	if filepath.Ext(file) == ".gz" {
+	if filepath.Ext(file) == prospect.ExtGZ {
 		r, err := gzip.NewReader(rs)
 		if err != nil {
 			return i, err
@@ -97,6 +97,9 @@ func (m *module) process(file string) (prospect.FileInfo, error) {
 		defer r.Close()
 		rs = r
 	}
+
+	c := prospect.NewCounter()
+	rs = io.TeeReader(rs, c)
 
 	headers, records, err := m.readFile(rs, m.cfg.Mime)
 	if err != nil {
@@ -110,8 +113,11 @@ func (m *module) process(file string) (prospect.FileInfo, error) {
 	//}
 	i.File = file
 	i.Parameters = []prospect.Parameter{
-		//prospect.MakeParameter(prospect.FileDuration, "300s"),
 		prospect.MakeParameter(prospect.FileRecords, fmt.Sprintf("%d", records)),
+		c.AsParameter(),
+	}
+	if filepath.Ext(file) == prospect.ExtGZ {
+		i.Parameters = append(i.Parameters, MakeParameter(prospect.FileEncoding), prospect.MimeGZ)
 	}
 	for j, h := range headers {
 		p := prospect.MakeParameter(fmt.Sprintf(fileHeader, j+1), h)
@@ -125,9 +131,6 @@ func (m *module) process(file string) (prospect.FileInfo, error) {
 			i.AcqTime = s.ModTime().UTC()
 		}
 		i.ModTime = s.ModTime()
-
-		p := prospect.MakeParameter(prospect.FileSize, fmt.Sprintf("%d", s.Size()))
-		i.Parameters = append(i.Parameters, p)
 	}
 
 	return i, nil

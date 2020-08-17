@@ -77,7 +77,7 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 	}()
 
 	var rs io.Reader = r
-	if filepath.Ext(file) == ".gz" {
+	if filepath.Ext(file) == prospect.ExtGZ {
 		r, err := gzip.NewReader(rs)
 		if err != nil {
 			return i, err
@@ -86,9 +86,17 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 		rs = r
 	}
 
+	c := prospect.NewCounter()
+	rs = io.TeeReader(rs, c)
+
 	if _, err := io.Copy(m.digest, rs); err != nil {
 		return i, err
 	}
+	i.Parameters = append(i.Parameters, c.AsParameter())
+	if filepath.Ext(file) == prospect.ExtGZ {
+		i.Parameters = append(i.Parameters, MakeParameter(prospect.FileEncoding), prospect.MimeGZ)
+	}
+
 	i.File = file
 	i.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
 
@@ -100,9 +108,6 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 			i.AcqTime = s.ModTime().UTC()
 		}
 		i.ModTime = s.ModTime().UTC()
-
-		p := prospect.MakeParameter(prospect.FileSize, fmt.Sprintf("%d", s.Size()))
-		i.Parameters = append(i.Parameters, p)
 	}
 	return i, err
 }

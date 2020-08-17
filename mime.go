@@ -11,6 +11,7 @@ const (
 	MimePlainDefault = "text/plain"
 	MimeCSV          = "text/csv"
 	MimeICN          = "text/plain;access=sequential;form=block-formatted;type=icn"
+	MimeGZ           = "application/gzip"
 )
 
 const (
@@ -20,6 +21,10 @@ const (
 	TypeHighRateData = "high rate data"
 	TypeRawTelemetry = "medium rate telemetry"
 	TypeUnavailable  = "unavailable"
+)
+
+const (
+	ExtGZ = ".gz"
 )
 
 type Mime struct {

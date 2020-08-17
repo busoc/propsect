@@ -17,6 +17,7 @@ const (
 	FileRecords  = "file.numrec"
 	FileMD5      = "file.md5"
 	FileDuration = "file.duration"
+	FileEncoding = "file.encoding"
 
 	PtrRef  = "ptr.%d.href"
 	PtrRole = "ptr.%d.role"
