@@ -117,7 +117,7 @@ func (m *module) process(file string) (prospect.FileInfo, error) {
 		c.AsParameter(),
 	}
 	if filepath.Ext(file) == prospect.ExtGZ {
-		i.Parameters = append(i.Parameters, MakeParameter(prospect.FileEncoding), prospect.MimeGZ)
+		i.Parameters = append(i.Parameters, prospect.MakeParameter(prospect.FileEncoding, prospect.MimeGZ))
 	}
 	for j, h := range headers {
 		p := prospect.MakeParameter(fmt.Sprintf(fileHeader, j+1), h)

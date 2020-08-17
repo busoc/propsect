@@ -226,7 +226,7 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 		i.Parameters = append(i.Parameters, ps...)
 		i.Parameters = append(i.Parameters, c.AsParameter())
 		if filepath.Ext(file) == prospect.ExtGZ {
-			i.Parameters = append(i.Parameters, MakeParameter(prospect.FileEncoding), prospect.MimeGZ)
+			i.Parameters = append(i.Parameters, prospect.MakeParameter(prospect.FileEncoding, prospect.MimeGZ))
 		}
 	}
 	return i, nil
