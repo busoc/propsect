@@ -115,6 +115,9 @@ var (
 )
 
 func (b *Builder) executeModule(mod Module, cfg Config) error {
+	if !mod.Indexable() {
+		return b.build(mod, cfg)
+	}
 	file := filepath.Join(os.TempDir(), mod.String()+"-cache.db")
 	db, err := bolt.Open(file, 0644, nil)
 	if err != nil {
@@ -129,14 +132,10 @@ func (b *Builder) executeModule(mod Module, cfg Config) error {
 		tx.CreateBucketIfNotExists(setFiles)
 		return nil
 	})
-
-	if mod.Indexable() {
-		if err := b.gatherInfo(db, mod, cfg); err != nil {
-			return err
-		}
-		return b.buildArchive(db)
+	if err := b.gatherInfo(db, mod, cfg); err != nil {
+		return err
 	}
-	return b.build(mod, cfg)
+	return b.buildArchive(db)
 }
 
 func (b *Builder) build(mod Module, cfg Config) error {

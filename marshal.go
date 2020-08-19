@@ -62,13 +62,14 @@ func (b *filebuilder) copyFile(file string, d Data) error {
 	if err := os.MkdirAll(filepath.Dir(newfile), 0755); err != nil {
 		return err
 	}
-	newfile = updateFile(newfile)
 	defer fmt.Fprintln(os.Stderr, file, newfile)
 	switch b.link {
 	case "soft":
-		return os.Symlink(file, newfile)
+		os.Symlink(file, newfile)
+		// return os.Symlink(file, newfile)
 	case "hard":
-		return os.Link(file, newfile)
+		os.Link(file, newfile)
+		// return os.Link(file, newfile)
 	default:
 		r, err := os.Open(file)
 		if err != nil {
@@ -85,6 +86,7 @@ func (b *filebuilder) copyFile(file string, d Data) error {
 		_, err = io.Copy(w, r)
 		return err
 	}
+	return nil
 }
 
 func (b *filebuilder) marshalData(d Data, samedir bool) error {
@@ -97,7 +99,6 @@ func (b *filebuilder) marshalData(d Data, samedir bool) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
-	file = updateFile(file)
 	w, err := os.Create(file + ".xml")
 	if err != nil {
 		return err
@@ -118,13 +119,6 @@ func (b *filebuilder) marshalMeta(m Meta) error {
 	}
 	defer w.Close()
 	return encodeMeta(w, m)
-}
-
-func updateFile(file string) string {
-	if ms, _ := filepath.Glob(file + "*"); len(ms) > 0 {
-		file = fmt.Sprintf("%s.%d", file, len(ms))
-	}
-	return file
 }
 
 type zipbuilder struct {
