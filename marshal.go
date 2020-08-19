@@ -62,6 +62,7 @@ func (b *filebuilder) copyFile(file string, d Data) error {
 	if err := os.MkdirAll(filepath.Dir(newfile), 0755); err != nil {
 		return err
 	}
+	newfile = updateFile(newfile)
 	defer fmt.Fprintln(os.Stderr, file, newfile)
 	switch b.link {
 	case "soft":
@@ -96,6 +97,7 @@ func (b *filebuilder) marshalData(d Data, samedir bool) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
+	file = updateFile(file)
 	w, err := os.Create(file + ".xml")
 	if err != nil {
 		return err
@@ -116,6 +118,13 @@ func (b *filebuilder) marshalMeta(m Meta) error {
 	}
 	defer w.Close()
 	return encodeMeta(w, m)
+}
+
+func updateFile(file string) string {
+	if ms, _ := filepath.Glob(file + "*"); len(ms) > 0 {
+		file = fmt.Sprintf("%s.%d", file, len(ms))
+	}
+	return file
 }
 
 type zipbuilder struct {
