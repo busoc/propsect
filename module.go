@@ -21,6 +21,7 @@ type FileInfo struct {
 	File string
 	Type string
 	Mime string
+	Run  string
 
 	Integrity string
 	Sum       string

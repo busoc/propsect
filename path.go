@@ -39,6 +39,7 @@ const (
 	levelMime   = "mime"
 	levelFormat = "format"
 	levelType   = "type"
+	levelRun    = "run"
 	levelYear   = "year"
 	levelDoy    = "doy"
 	levelMonth  = "month"
@@ -246,6 +247,8 @@ func (f fragment) Resolve(dat Data) string {
 			}
 		}
 		// str = "unknown"
+	case levelRun:
+		str = dat.Info.Run
 	case levelLevel:
 		str = strconv.Itoa(dat.Level)
 	case levelSource:

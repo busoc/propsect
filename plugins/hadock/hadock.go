@@ -202,8 +202,9 @@ func (m module) process(file string) (prospect.FileInfo, error) {
 		i.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
 		i.AcqTime = timeFromFile(file)
 
-		if xs, err := parseFilename(file); err == nil {
+		if upi, xs, err := parseFilename(file); err == nil {
 			ps = append(ps, xs...)
+			i.Run = upi
 		}
 		if s, err := r.Stat(); err == nil {
 			i.ModTime = s.ModTime().UTC()
@@ -256,7 +257,7 @@ func readFile(rs io.Reader) ([]prospect.Parameter, error) {
 	return ps, nil
 }
 
-func parseFilename(file string) ([]prospect.Parameter, error) {
+func parseFilename(file string) (string, []prospect.Parameter, error) {
 	dir, file := filepath.Split(file)
 	parts := strings.Split(file, "_")
 
@@ -304,7 +305,7 @@ func parseFilename(file string) ([]prospect.Parameter, error) {
 		ps = append(ps, prospect.MakeParameter(fileBad, fmt.Sprintf("%t", bad)))
 	}
 
-	return ps, nil
+	return strings.Join(upi, "_"), ps, nil
 }
 
 func timeFromFile(file string) time.Time {
