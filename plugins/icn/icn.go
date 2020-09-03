@@ -220,7 +220,7 @@ func (m *module) processListing(file, stamp string) (prospect.FileInfo, error) {
 	i.AcqTime = when
 	i.ModTime = s.ModTime().UTC()
 	i.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
-	i.File = r.Name()
+	i.File = filepath.Join(filepath.Dir(r.Name()), when.Format("2006_002") + ".icn") //r.Name()
 
 	return i, err
 }
