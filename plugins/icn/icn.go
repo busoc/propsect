@@ -220,10 +220,18 @@ func (m *module) processListing(file, stamp string) (prospect.FileInfo, error) {
 	i.AcqTime = when
 	i.ModTime = s.ModTime().UTC()
 	i.Sum = fmt.Sprintf("%x", m.digest.Sum(nil))
-	i.File = filepath.Join(filepath.Dir(r.Name()), when.Format("2006_002") + ".icn") //r.Name()
+	i.File = r.Name()
+	// i.File = filepath.Join(filepath.Dir(r.Name()), when.Format("2006_002") + ".icn") //r.Name()
 
 	return i, err
 }
+
+// func (m *module) resolvePath(file string) string {
+// 	if filepath.IsAbs(file) {
+// 		return file
+// 	}
+// 	return filepath.Join(filepath.Dir(m.cfg.Location), file)
+// }
 
 func openFile(file string) (*os.File, error) {
 	r, err := os.Open(file)
