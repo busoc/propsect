@@ -266,7 +266,7 @@ func startElement(label string) xml.StartElement {
 	return xml.StartElement{Name: n}
 }
 
-func encodeMeta(w io.Writer, m Meta) error {
+func EncodeMeta(w io.Writer, m Meta) error {
 	doc := struct {
 		XMLName  xml.Name `xml:"http://eusoc.upm.es/SDC/Experiments/1 experiment"`
 		Instance string   `xml:"xmlns:xsi,attr"`
@@ -280,7 +280,7 @@ func encodeMeta(w io.Writer, m Meta) error {
 	return encodeDocument(w, doc)
 }
 
-func encodeData(w io.Writer, d Data) error {
+func EncodeData(w io.Writer, d Data) error {
 	doc := struct {
 		XMLName  xml.Name `xml:"http://eusoc.upm.es/SDC/Metadata/1 metadata"`
 		Instance string   `xml:"xmlns:xsi,attr"`

@@ -1,0 +1,431 @@
+package main
+
+import (
+	"bytes"
+	"crypto/sha256"
+	"flag"
+	"fmt"
+	"image/jpeg"
+	"io"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/busoc/nef"
+	"github.com/busoc/prospect"
+	"github.com/midbel/toml"
+)
+
+const (
+	RoleMeta = "exif"
+	RoleNef  = "nef"
+	RoleImg  = "image"
+	RoleData = "data"
+	Ptr      = "ptr.%d.href"
+	Role     = "ptr.%d.role"
+	SizeX    = "image.x"
+	SizeY    = "image.y"
+)
+
+const (
+	ExtDAT = ".dat"
+	ExtJPG = ".jpg"
+	ExtTXT = ".txt"
+  ExtNEF = ".NEF"
+  ExtMOV = ".MOV"
+  ExtDUMP = ".dump"
+
+	SHA = "SHA256"
+
+	MimeNEF  = "image/x-nikon-nef"
+  MimeMOV  = "video/quicktime"
+  MimeDUMP = "text/csv"
+	TypeNEF  = "raw image"
+	TypeExif = "exif tags listing"
+  TypeMOV = "video"
+  TypeDUMP = "parameters dump"
+)
+
+func main() {
+	flag.Parse()
+
+	cfg := struct {
+		Datadir string `toml:"data"`
+		Archive string
+		Exif    []string
+
+		prospect.Meta `toml:"meta"`
+		prospect.Data `toml:"dataset"`
+	}{}
+	if err := toml.DecodeFile(flag.Arg(0), &cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	if err := writeMeta(cfg.Archive, cfg.Meta); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+
+	cfg.Data.Experiment = cfg.Meta.Name
+	err := filepath.Walk(cfg.Datadir, func(file string, i os.FileInfo, err error) error {
+		if err != nil || i.IsDir() {
+			return err
+		}
+    switch filepath.Ext(file) {
+    case ExtMOV, ExtDUMP:
+      err = processOther(file, cfg.Archive, cfg.Data)
+    case ExtNEF:
+      err = processFile(file, cfg.Archive, cfg.Exif, cfg.Data)
+    default:
+    }
+    return err
+	})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(3)
+	}
+}
+
+func processOther(file, archive string, data prospect.Data) error {
+  switch filepath.Ext(file) {
+  case ExtMOV:
+    data.Info.Mime = MimeMOV
+    data.Info.Type = TypeMOV
+  case ExtDUMP:
+    data.Info.Mime = MimeDUMP
+    data.Info.Type = TypeDUMP
+  default:
+    return fmt.Errorf("%s: unsupported file extension", filepath.Ext(file))
+  }
+  data.Info.AcqTime = time.Now()
+  data.Info.ModTime = time.Now()
+
+  datadir, metadir, err := mkdirAll(archive, time.Now())
+  if err != nil {
+    return err
+  }
+
+  filename, sum, err := copyFile(file, datadir)
+  if err != nil {
+    return err
+  }
+  data.Info.File = filename
+  data.Info.Integrity = SHA
+  data.Info.Sum = fmt.Sprintf("%x", sum)
+  return writeData(metadir, data)
+}
+
+func copyFile(file, dir string) (string, []byte, error) {
+  r, err := os.Open(file)
+  if err != nil {
+    return "", nil, err
+  }
+  defer r.Close()
+
+  w, err := os.Create(filepath.Join(dir, filepath.Base(file)))
+  if err != nil {
+    return "", nil, err
+  }
+  defer w.Close()
+
+  var (
+    sum = sha256.New()
+    rs = io.TeeReader(r, sum)
+  )
+  _, err = io.Copy(w, rs)
+  return w.Name(), sum.Sum(nil)[:], err
+}
+
+func processFile(file, archive string, exiftool []string, data prospect.Data) error {
+	r, err := os.Open(file)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	var (
+		origin   time.Time
+		basename = trimExt(file)
+		metafile = basename + ".exif" + ExtTXT
+		params   []prospect.Parameter
+		meta     []byte
+	)
+
+	if len(exiftool) > 0 {
+		var (
+			args = append(exiftool, file)
+			cmd  = exec.Command(args[0], args[1:]...)
+		)
+		buf, err := cmd.Output()
+		if err != nil {
+			return err
+		}
+		meta = buf
+	}
+
+	files, err := nef.Decode(r)
+	if err != nil {
+		return err
+	}
+	for i := range files {
+		when, _ := files[i].GetTag(0x0132, nef.Tiff)
+    datadir, metadir, err := mkdirAll(archive, when.Time())
+    if err != nil {
+      return err
+    }
+    ps := createParam(1, filepath.Join(datadir, filepath.Base(file)), RoleNef)
+		if len(meta) > 0 {
+      ps = append(ps, createParam(2, filepath.Join(datadir, metafile), RoleMeta)...)
+		}
+    data.Info.ModTime = when.Time()
+    data.Info.AcqTime = when.Time()
+		data.Info.Parameters = ps
+		ds, err := processImage(datadir, basename, files[i], data)
+		if err != nil {
+			return err
+		}
+		if err := writeMultiData(metadir, ds); err != nil {
+			return err
+		}
+		params, origin = append(params, appendParams(ds)...), when.Time()
+	}
+
+  datadir, metadir, err := mkdirAll(archive, origin)
+  if err != nil {
+    return err
+  }
+  data.Info.ModTime = origin
+  data.Info.AcqTime = origin
+  data.Info.Parameters = createParam(1, filepath.Join(datadir, filepath.Base(file)), RoleNef)
+	d, err := processMeta(filepath.Join(datadir, metafile), meta, data)
+	if err != nil {
+		return err
+	}
+	if err := writeData(filepath.Join(metadir, metafile), d); err != nil {
+		return err
+	}
+	if i := len(params); len(meta) > 0 {
+    params = append(params, createParam(i, filepath.Join(datadir, metafile), RoleMeta)...)
+	}
+	data.Info.Parameters = params
+	d, err = processNEF(datadir, file, data)
+	if err != nil {
+		return err
+	}
+	return writeData(filepath.Join(metadir, filepath.Base(file)), d)
+}
+
+func createParam(i int, value, role string) []prospect.Parameter {
+  if i <= 0 {
+    i = 1
+  }
+  var (
+    pref = prospect.MakeParameter(fmt.Sprintf(Ptr, i), value)
+    prol = prospect.MakeParameter(fmt.Sprintf(Role, i), role)
+  )
+  return []prospect.Parameter{pref, prol}
+}
+
+func appendParams(data []prospect.Data) []prospect.Parameter {
+	params := make([]prospect.Parameter, 0, len(data))
+	for _, d := range data {
+		var (
+			role = RoleImg
+			i    = len(params)
+		)
+		if filepath.Ext(d.Info.File) == ExtDAT {
+			role = RoleData
+		}
+		params = append(params, createParam(i+1, d.Info.File, role)...)
+	}
+	return params
+}
+
+func processMeta(file string, meta []byte, data prospect.Data) (prospect.Data, error) {
+	if err := ioutil.WriteFile(file, meta, 0644); err != nil {
+		return data, err
+	}
+	data.Info.File = file
+	data.Info.Integrity = SHA
+	data.Info.Sum = fmt.Sprintf("%x", sha256.Sum256(meta))
+	data.Info.Mime = prospect.MimePlainDefault
+	data.Info.Type = TypeExif
+
+	return data, nil
+}
+
+func processNEF(dir, file string, data prospect.Data) (prospect.Data, error) {
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return data, err
+	}
+	r, err := os.Open(file)
+	if err != nil {
+		return data, err
+	}
+	defer r.Close()
+
+	w, err := os.Create(filepath.Join(dir, filepath.Base(file)))
+	if err != nil {
+		return data, err
+	}
+	defer w.Close()
+
+	var (
+		sum = sha256.New()
+		ws  = io.MultiWriter(sum, w)
+	)
+	size, err := io.Copy(ws, r)
+	if err != nil {
+		return data, err
+	}
+	data.Info.Size = int(size)
+	data.Info.File = w.Name()
+	data.Info.Integrity = SHA
+	data.Info.Sum = fmt.Sprintf("%x", sum.Sum(nil))
+	data.Info.Mime = MimeNEF
+	data.Info.Type = TypeNEF
+
+	return data, nil
+}
+
+func processImage(dir, base string, f *nef.File, data prospect.Data) ([]prospect.Data, error) {
+	var ds []prospect.Data
+
+	d, err := extractImage(dir, base, f, data)
+	if err != nil {
+		return nil, err
+	}
+	ds = append(ds, d)
+	for i := range f.Files {
+		xs, err := processImage(dir, base, f.Files[i], data)
+		if err != nil {
+			return nil, err
+		}
+		ds = append(ds, xs...)
+	}
+	return ds, nil
+}
+
+func extractImage(dir, base string, f *nef.File, data prospect.Data) (prospect.Data, error) {
+	data.Info.Type = prospect.TypeImage
+	data.Info.Mime = prospect.MimeJPG
+	data.Info.Level = 1
+	data.Info.Integrity = SHA
+
+	var (
+		buf []byte
+		err error
+		ext string
+	)
+	if !f.IsSupported() {
+		data.Info.Mime = prospect.MimeJPG
+		data.Info.Type = prospect.TypeData
+		data.Info.Level = 0
+
+		buf, err = writeBytes(f)
+		ext = ExtDAT
+	} else {
+		buf, err = writeImage(f)
+		ext = ExtJPG
+
+		cfg, _ := jpeg.DecodeConfig(bytes.NewReader(buf))
+		ps := []prospect.Parameter{
+			prospect.MakeParameter(SizeX, fmt.Sprintf("%d", cfg.Width)),
+			prospect.MakeParameter(SizeY, fmt.Sprintf("%d", cfg.Height)),
+		}
+		data.Info.Parameters = append(data.Info.Parameters, ps...)
+	}
+	if err != nil {
+		return data, err
+	}
+	data.Info.Size = len(buf)
+	data.Info.Sum = fmt.Sprintf("%x", sha256.Sum256(buf))
+	data.Info.File = filepath.Join(dir, base+"_"+f.Filename()) + ext
+
+	if err := ioutil.WriteFile(data.Info.File, buf, 0644); err != nil {
+		return data, err
+	}
+	return data, nil
+}
+
+func writeImage(f *nef.File) ([]byte, error) {
+	img, err := f.Image()
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	err = jpeg.Encode(&buf, img, nil)
+	return buf.Bytes(), err
+}
+
+func writeBytes(f *nef.File) ([]byte, error) {
+	return f.Bytes()
+}
+
+func writeMultiData(dir string, data []prospect.Data) error {
+	for _, d := range data {
+		if err := writeData(filepath.Join(dir, filepath.Base(d.Info.File)), d); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeData(file string, data prospect.Data) error {
+	w, err := os.Create(file + ".xml")
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+	return prospect.EncodeData(w, data)
+}
+
+func writeMeta(dir string, meta prospect.Meta) error {
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	w, err := os.Create(filepath.Join(dir, fmt.Sprintf("MD_EXP_%s.xml", meta.Accr)))
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+	return prospect.EncodeMeta(w, meta)
+}
+
+func mkdirAll(dir string, when time.Time) (string, string, error) {
+  datadir, err := mkdirData(dir, when)
+  if err != nil {
+    return "", "", err
+  }
+  metadir, err := mkdirMeta(dir, when)
+  if err != nil {
+    return "", "", err
+  }
+  return datadir, metadir, nil
+}
+
+func mkdirData(dir string, when time.Time) (string, error) {
+	var (
+		year = when.Format("2006")
+		doy  = when.Format("002")
+	)
+	dir = filepath.Join(dir, year, doy)
+	return dir, os.MkdirAll(dir, 0755)
+}
+
+func mkdirMeta(dir string, when time.Time) (string, error) {
+	return mkdirData(filepath.Join(dir, "metadata"), when)
+}
+
+func trimExt(file string) string {
+  return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
+}
+
+func trimPath(file, archive string) string {
+  file = strings.TrimPrefix(file, filepath.Clean(archive))
+  return filepath.Clean(file)
+}

@@ -105,7 +105,7 @@ func (b *filebuilder) marshalData(d Data, samedir bool) error {
 	}
 	defer w.Close()
 
-	return encodeData(w, d)
+	return EncodeData(w, d)
 }
 
 func (b *filebuilder) marshalMeta(m Meta) error {
@@ -118,7 +118,7 @@ func (b *filebuilder) marshalMeta(m Meta) error {
 		return err
 	}
 	defer w.Close()
-	return encodeMeta(w, m)
+	return EncodeMeta(w, m)
 }
 
 type zipbuilder struct {
@@ -170,7 +170,7 @@ func (b *zipbuilder) marshalData(d Data, samedir bool) error {
 		return err
 	}
 
-	return encodeData(w, d)
+	return EncodeData(w, d)
 }
 
 func (b *zipbuilder) marshalMeta(m Meta) error {
@@ -182,5 +182,5 @@ func (b *zipbuilder) marshalMeta(m Meta) error {
 	if err != nil {
 		return err
 	}
-	return encodeMeta(w, m)
+	return EncodeMeta(w, m)
 }

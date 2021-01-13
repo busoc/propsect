@@ -12,6 +12,7 @@ const (
 	MimeCSV          = "text/csv"
 	MimeICN          = "text/plain;access=sequential;form=block-formatted;type=icn"
 	MimeGZ           = "application/gzip"
+	MimeJPG          = "image/jpg"
 )
 
 const (
@@ -21,6 +22,7 @@ const (
 	TypeHighRateData = "high rate data"
 	TypeRawTelemetry = "medium rate telemetry"
 	TypeUnavailable  = "unavailable"
+	TypeImage        = "image"
 )
 
 const (
