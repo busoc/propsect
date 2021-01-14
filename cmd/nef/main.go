@@ -152,7 +152,7 @@ func processOther(file, archive string, exif []string, data prospect.Data) error
 	}
 
 	if len(meta) > 0 {
-		data.Info.Parameters = createParam(1, filepath.Join(datadir, file), RoleMov)
+		data.Info.Parameters = createParamPtr(1, filepath.Join(datadir, file), RoleMov)
 		basename := trimExt(file) + ".exif" + ExtTXT
 		d, err := processMeta(filepath.Join(datadir, basename), meta, data)
 		if err != nil {
@@ -161,12 +161,12 @@ func processOther(file, archive string, exif []string, data prospect.Data) error
 		if err := writeData(filepath.Join(metadir, basename), d); err != nil {
 			return err
 		}
-		data.Info.Parameters = createParam(1, filepath.Join(datadir, basename), RoleMeta)
+		data.Info.Parameters = createParamPtr(1, filepath.Join(datadir, basename), RoleMeta)
 	}
 
-	if i := len(data.Info.Parameters); length > 0 {
-		ps := createParam(i+1, length.String(), Duration)
-		data.Info.Parameters = append(data.Info.Parameters, ps...)
+	if length > 0 {
+		p := prospect.makeParameter(Duration, length.String())
+		data.Info.Parameters = append(data.Info.Parameters, p)
 	}
 
 	filename, sum, err := copyFile(file, datadir)
@@ -176,7 +176,7 @@ func processOther(file, archive string, exif []string, data prospect.Data) error
 	data.Info.File = filename
 	data.Info.Integrity = SHA
 	data.Info.Sum = fmt.Sprintf("%x", sum)
-	return writeData(metadir, data)
+	return writeData(filepath.Join(metadir, filepath.Base(file)), data)
 }
 
 func timesFromMov(file string) (time.Time, time.Time, time.Duration, error) {
@@ -280,9 +280,9 @@ func processFile(file, archive string, exif []string, data prospect.Data) error 
 		if err != nil {
 			return err
 		}
-		ps := createParam(1, filepath.Join(datadir, filepath.Base(file)), RoleNef)
+		ps := createParamPtr(1, filepath.Join(datadir, filepath.Base(file)), RoleNef)
 		if len(meta) > 0 {
-			ps = append(ps, createParam(2, filepath.Join(datadir, metafile), RoleMeta)...)
+			ps = append(ps, createParamPtr(2, filepath.Join(datadir, metafile), RoleMeta)...)
 		}
 		data.Info.ModTime = when.Time()
 		data.Info.AcqTime = when.Time()
@@ -303,7 +303,7 @@ func processFile(file, archive string, exif []string, data prospect.Data) error 
 	}
 	data.Info.ModTime = origin
 	data.Info.AcqTime = origin
-	data.Info.Parameters = createParam(1, filepath.Join(datadir, filepath.Base(file)), RoleNef)
+	data.Info.Parameters = createParamPtr(1, filepath.Join(datadir, filepath.Base(file)), RoleNef)
 	d, err := processMeta(filepath.Join(datadir, metafile), meta, data)
 	if err != nil {
 		return err
@@ -312,7 +312,7 @@ func processFile(file, archive string, exif []string, data prospect.Data) error 
 		return err
 	}
 	if i := len(params); len(meta) > 0 {
-		params = append(params, createParam(i, filepath.Join(datadir, metafile), RoleMeta)...)
+		params = append(params, createParamPtr(i, filepath.Join(datadir, metafile), RoleMeta)...)
 	}
 	data.Info.Parameters = params
 	d, err = processNEF(datadir, file, data)
@@ -322,7 +322,7 @@ func processFile(file, archive string, exif []string, data prospect.Data) error 
 	return writeData(filepath.Join(metadir, filepath.Base(file)), d)
 }
 
-func createParam(i int, value, role string) []prospect.Parameter {
+func createParamPtr(i int, value, role string) []prospect.Parameter {
 	if i <= 0 {
 		i = 1
 	}
@@ -343,7 +343,7 @@ func appendParams(data []prospect.Data) []prospect.Parameter {
 		if filepath.Ext(d.Info.File) == ExtDAT {
 			role = RoleData
 		}
-		params = append(params, createParam(i+1, d.Info.File, role)...)
+		params = append(params, createParamPtr(i+1, d.Info.File, role)...)
 	}
 	return params
 }
