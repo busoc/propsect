@@ -59,6 +59,7 @@ func main() {
 	cfg := struct {
 		Datadir string `toml:"data"`
 		Archive string
+		Types   map[string]string
 		Exif    []string
 
 		prospect.Meta `toml:"meta"`
@@ -79,13 +80,27 @@ func main() {
 		if err != nil || i.IsDir() {
 			return err
 		}
-		switch filepath.Ext(file) {
+		// var (
+		// 	now = time.Now()
+		// 	ext = filepath.Ext(file)
+		// 	archive = cfg.Types[ext]
+		// )
+		// archive = filepath.Join(cfg.Archive, archive)
+		// archive = filepath.Clean(archive)
+		var (
+			now = time.Now()
+			ext = filepath.Ext(file)
+			archive = filepath.Clean(cfg.Archive)
+		)
+		switch ext {
 		case ExtMOV, ExtDUMP:
-			err = processOther(file, cfg.Archive, cfg.Exif, cfg.Data)
+			err = processOther(file, archive, cfg.Exif, cfg.Data)
 		case ExtNEF:
-			err = processFile(file, cfg.Archive, cfg.Exif, cfg.Data)
+			err = processFile(file, archive, cfg.Exif, cfg.Data)
 		default:
 		}
+		fmt.Printf("done processing %s -> %s (%s)", file, archive, time.Since(now))
+		fmt.Println()
 		return err
 	})
 	if err != nil {
@@ -199,12 +214,10 @@ func timesFromDump(file string) (time.Time, time.Time, time.Duration, error) {
 				return acq, mod, 0, err
 			}
 		}
-		if err != nil {
-			mod, err = time.Parse("2006-01-02T15:04:05.000", row[0])
-			if err != nil {
-				return acq, mod, 0, err
-			}
+		if len(row) == 0 || err != nil {
+			break
 		}
+		mod, err = time.Parse("2006-01-02T15:04:05.000", row[0])
 	}
 	return acq, mod, mod.Sub(acq), nil
 }
