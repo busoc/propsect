@@ -75,6 +75,9 @@ func Load(file string) (Settings, error) {
 	if err != nil {
 		return set, err
 	}
+	if err = os.MkdirAll(set.Archive); err != nil {
+		return set, err
+	}
 	if err = os.Chdir(set.Archive); err != nil {
 		return set, err
 	}
@@ -105,8 +108,10 @@ func main() {
 			ext     = filepath.Ext(file)
 		)
 		switch ext {
-		case ExtMOV, ExtDUMP:
-			err = processOther(file, set.Exif, set.Data)
+		case ExtMOV:
+			err = processMov(file, set.Exif, set.Data)
+		case ExtDUMP:
+			err = processDump(file, set.Data)
 		case ExtNEF:
 			err = processFile(file, set.Exif, set.Data)
 		default:
@@ -121,43 +126,27 @@ func main() {
 	}
 }
 
-func processOther(file string, exif []string, data prospect.Data) error {
-	var (
-		acq    time.Time
-		mod    time.Time
-		length time.Duration
-		meta   []byte
-		err    error
-	)
-	switch filepath.Ext(file) {
-	case ExtMOV:
-		data.Info.Mime = MimeMOV
-		data.Info.Type = TypeMOV
-		acq, mod, length, err = timesFromMov(file)
-
-		if len(exif) > 0 {
-			args := append(exif, file)
-			cmd := exec.Command(args[0], args[1:]...)
-
-			buf, err := cmd.Output()
-			if err != nil {
-				return err
-			}
-			meta = buf
-		}
-	case ExtDUMP:
-		data.Info.Mime = MimeDUMP
-		data.Info.Type = TypeDUMP
-		acq, mod, length, err = timesFromDump(file)
-	default:
-		return fmt.Errorf("%s: unsupported file extension", filepath.Ext(file))
-	}
+func processMov(file string, exif []string, data prospect.Data) error {
+	data.Info.Mime = MimeMOV
+	data.Info.Type = TypeMOV
+	acq, mod, length, err := timesFromMov(file)
 	if err != nil {
 		return err
 	}
 	data.Info.AcqTime = acq
 	data.Info.ModTime = mod
 	data.Info.Level = 1
+
+	if len(exif) > 0 {
+		args := append(exif, file)
+		cmd := exec.Command(args[0], args[1:]...)
+
+		buf, err := cmd.Output()
+		if err != nil {
+			return err
+		}
+		meta = buf
+	}
 
 	datadir, metadir, err := mkdirAll("", acq)
 	if err != nil {
@@ -175,6 +164,34 @@ func processOther(file string, exif []string, data prospect.Data) error {
 			return err
 		}
 		data.Info.Parameters = createParamPtr(1, filepath.Join(datadir, basename), RoleMeta)
+	}
+
+	if length > 0 {
+		p := prospect.MakeParameter(Duration, length.String())
+		data.Info.Parameters = append(data.Info.Parameters, p)
+	}
+
+	filename, sum, err := copyFile(file, datadir)
+	if err != nil {
+		return err
+	}
+	data.Info.File = filename
+	data.Info.Integrity = SHA
+	data.Info.Sum = fmt.Sprintf("%x", sum)
+	return writeData(filepath.Join(metadir, filepath.Base(file)), data)
+}
+
+func processDump(file string, data prospect.Data) error {
+	data.Info.Mime = MimeDUMP
+	data.Info.Type = TypeDUMP
+	acq, mod, length, err = timesFromDump(file)
+	if err != nil {
+		return err
+	}
+
+	datadir, metadir, err := mkdirAll("", acq)
+	if err != nil {
+		return err
 	}
 
 	if length > 0 {
@@ -502,7 +519,7 @@ func writeData(file string, data prospect.Data) error {
 }
 
 func writeMeta(dir string, meta prospect.Meta) error {
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0755); dir != "" && err != nil {
 		return err
 	}
 	w, err := os.Create(filepath.Join(dir, fmt.Sprintf("MD_EXP_%s.xml", meta.Accr)))
@@ -529,9 +546,8 @@ func mkdirData(dir string, when time.Time) (string, error) {
 	var (
 		year = when.Format("2006")
 		doy  = when.Format("002")
-		hour = when.Format("15")
 	)
-	dir = filepath.Join(dir, year, doy, hour)
+	dir = filepath.Join(dir, year, doy)
 	return dir, os.MkdirAll(dir, 0755)
 }
 
