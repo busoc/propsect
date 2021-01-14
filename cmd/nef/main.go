@@ -75,7 +75,7 @@ func Load(file string) (Settings, error) {
 	if err != nil {
 		return set, err
 	}
-	if err = os.MkdirAll(set.Archive); err != nil {
+	if err = os.MkdirAll(set.Archive, 0755); err != nil {
 		return set, err
 	}
 	if err = os.Chdir(set.Archive); err != nil {
@@ -137,6 +137,7 @@ func processMov(file string, exif []string, data prospect.Data) error {
 	data.Info.ModTime = mod
 	data.Info.Level = 1
 
+	var meta []byte
 	if len(exif) > 0 {
 		args := append(exif, file)
 		cmd := exec.Command(args[0], args[1:]...)
@@ -184,10 +185,13 @@ func processMov(file string, exif []string, data prospect.Data) error {
 func processDump(file string, data prospect.Data) error {
 	data.Info.Mime = MimeDUMP
 	data.Info.Type = TypeDUMP
-	acq, mod, length, err = timesFromDump(file)
+	acq, mod, length, err := timesFromDump(file)
 	if err != nil {
 		return err
 	}
+	data.Info.AcqTime = acq
+	data.Info.ModTime = mod
+	data.Info.Level = 1
 
 	datadir, metadir, err := mkdirAll("", acq)
 	if err != nil {
