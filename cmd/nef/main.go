@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/csv"
 	"flag"
 	"fmt"
 	"image/jpeg"
@@ -14,8 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/busoc/nef"
 	"github.com/busoc/prospect"
+	"github.com/midbel/exif/mov"
+	"github.com/midbel/exif/nef"
 	"github.com/midbel/toml"
 )
 
@@ -23,30 +25,32 @@ const (
 	RoleMeta = "exif"
 	RoleNef  = "nef"
 	RoleImg  = "image"
+	RoleMov = "video"
 	RoleData = "data"
 	Ptr      = "ptr.%d.href"
 	Role     = "ptr.%d.role"
 	SizeX    = "image.x"
 	SizeY    = "image.y"
+	Duration = "duration"
 )
 
 const (
-	ExtDAT = ".dat"
-	ExtJPG = ".jpg"
-	ExtTXT = ".txt"
-  ExtNEF = ".NEF"
-  ExtMOV = ".MOV"
-  ExtDUMP = ".dump"
+	ExtDAT  = ".dat"
+	ExtJPG  = ".jpg"
+	ExtTXT  = ".txt"
+	ExtNEF  = ".NEF"
+	ExtMOV  = ".MOV"
+	ExtDUMP = ".dump"
 
 	SHA = "SHA256"
 
 	MimeNEF  = "image/x-nikon-nef"
-  MimeMOV  = "video/quicktime"
-  MimeDUMP = "text/csv"
+	MimeMOV  = "video/quicktime"
+	MimeDUMP = "text/csv;comma=tab"
 	TypeNEF  = "raw image"
 	TypeExif = "exif tags listing"
-  TypeMOV = "video"
-  TypeDUMP = "parameters dump"
+	TypeMOV  = "video"
+	TypeDUMP = "parameters dump"
 )
 
 func main() {
@@ -75,14 +79,14 @@ func main() {
 		if err != nil || i.IsDir() {
 			return err
 		}
-    switch filepath.Ext(file) {
-    case ExtMOV, ExtDUMP:
-      err = processOther(file, cfg.Archive, cfg.Data)
-    case ExtNEF:
-      err = processFile(file, cfg.Archive, cfg.Exif, cfg.Data)
-    default:
-    }
-    return err
+		switch filepath.Ext(file) {
+		case ExtMOV, ExtDUMP:
+			err = processOther(file, cfg.Archive, cfg.Exif, cfg.Data)
+		case ExtNEF:
+			err = processFile(file, cfg.Archive, cfg.Exif, cfg.Data)
+		default:
+		}
+		return err
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -90,57 +94,143 @@ func main() {
 	}
 }
 
-func processOther(file, archive string, data prospect.Data) error {
-  switch filepath.Ext(file) {
-  case ExtMOV:
-    data.Info.Mime = MimeMOV
-    data.Info.Type = TypeMOV
-  case ExtDUMP:
-    data.Info.Mime = MimeDUMP
-    data.Info.Type = TypeDUMP
-  default:
-    return fmt.Errorf("%s: unsupported file extension", filepath.Ext(file))
-  }
-  data.Info.AcqTime = time.Now()
-  data.Info.ModTime = time.Now()
+func processOther(file, archive string, exif []string, data prospect.Data) error {
+	var (
+		acq    time.Time
+		mod    time.Time
+		length time.Duration
+		meta   []byte
+		err    error
+	)
+	switch filepath.Ext(file) {
+	case ExtMOV:
+		data.Info.Mime = MimeMOV
+		data.Info.Type = TypeMOV
+		acq, mod, length, err = timesFromMov(file)
 
-  datadir, metadir, err := mkdirAll(archive, time.Now())
-  if err != nil {
-    return err
-  }
+		if len(exif) > 0 {
+			args := append(exif, file)
+			cmd := exec.Command(args[0], args[1:]...)
 
-  filename, sum, err := copyFile(file, datadir)
-  if err != nil {
-    return err
-  }
-  data.Info.File = filename
-  data.Info.Integrity = SHA
-  data.Info.Sum = fmt.Sprintf("%x", sum)
-  return writeData(metadir, data)
+			buf, err := cmd.Output()
+			if err != nil {
+				return err
+			}
+			meta = buf
+		}
+	case ExtDUMP:
+		data.Info.Mime = MimeDUMP
+		data.Info.Type = TypeDUMP
+		acq, mod, length, err = timesFromDump(file)
+	default:
+		return fmt.Errorf("%s: unsupported file extension", filepath.Ext(file))
+	}
+	if err != nil {
+		return err
+	}
+	data.Info.AcqTime = acq
+	data.Info.ModTime = mod
+
+	datadir, metadir, err := mkdirAll(archive, acq)
+	if err != nil {
+		return err
+	}
+
+	if len(meta) > 0 {
+		data.Info.Parameters = createParam(1, filepath.Join(datadir, file), RoleMov)
+		basename := trimExt(file) + ".exif" + ExtTXT
+		d, err := processMeta(filepath.Join(datadir, basename), meta, data)
+		if err != nil {
+			return err
+		}
+		if err := writeData(filepath.Join(metadir, basename), d); err != nil {
+			return err
+		}
+		data.Info.Parameters = createParam(1, filepath.Join(datadir, basename), RoleMeta)
+	}
+
+	if i := len(data.Info.Parameters); length > 0 {
+		ps := createParam(i+1, length.String(), Duration)
+		data.Info.Parameters = append(data.Info.Parameters, ps...)
+	}
+
+	filename, sum, err := copyFile(file, datadir)
+	if err != nil {
+		return err
+	}
+	data.Info.File = filename
+	data.Info.Integrity = SHA
+	data.Info.Sum = fmt.Sprintf("%x", sum)
+	return writeData(metadir, data)
+}
+
+func timesFromMov(file string) (time.Time, time.Time, time.Duration, error) {
+	qt, err := mov.Decode(file)
+	if err != nil {
+		return time.Time{}, time.Time{}, 0, err
+	}
+	defer qt.Close()
+
+	p, err := qt.DecodeProfile()
+	if err != nil {
+		return time.Time{}, time.Time{}, 0, err
+	}
+	return p.AcqTime(), p.ModTime(), p.Length(), nil
+}
+
+func timesFromDump(file string) (time.Time, time.Time, time.Duration, error) {
+	r, err := os.Open(file)
+	if err != nil {
+		return time.Time{}, time.Time{}, 0, err
+	}
+	defer r.Close()
+
+	rs := csv.NewReader(r)
+	rs.Comma = '\t'
+
+	rs.Read()
+
+	var acq, mod time.Time
+	for i := 0; ; i++ {
+		row, err := rs.Read()
+		if i == 0 {
+			acq, err = time.Parse("2006-01-02T15:04:05.000", row[0])
+			if err != nil {
+				return acq, mod, 0, err
+			}
+		}
+		if err != nil {
+			mod, err = time.Parse("2006-01-02T15:04:05.000", row[0])
+			if err != nil {
+				return acq, mod, 0, err
+			}
+		}
+	}
+	return acq, mod, mod.Sub(acq), nil
 }
 
 func copyFile(file, dir string) (string, []byte, error) {
-  r, err := os.Open(file)
-  if err != nil {
-    return "", nil, err
-  }
-  defer r.Close()
+	r, err := os.Open(file)
+	if err != nil {
+		return "", nil, err
+	}
+	defer r.Close()
 
-  w, err := os.Create(filepath.Join(dir, filepath.Base(file)))
-  if err != nil {
-    return "", nil, err
-  }
-  defer w.Close()
+	w, err := os.Create(filepath.Join(dir, filepath.Base(file)))
+	if err != nil {
+		return "", nil, err
+	}
+	defer w.Close()
 
-  var (
-    sum = sha256.New()
-    rs = io.TeeReader(r, sum)
-  )
-  _, err = io.Copy(w, rs)
-  return w.Name(), sum.Sum(nil)[:], err
+	var (
+		sum = sha256.New()
+		rs  = io.TeeReader(r, sum)
+	)
+	_, err = io.Copy(w, rs)
+	return w.Name(), sum.Sum(nil)[:], err
 }
 
-func processFile(file, archive string, exiftool []string, data prospect.Data) error {
+func processFile(file, archive string, exif []string, data prospect.Data) error {
 	r, err := os.Open(file)
 	if err != nil {
 		return err
@@ -155,9 +245,9 @@ func processFile(file, archive string, exiftool []string, data prospect.Data) er
 		meta     []byte
 	)
 
-	if len(exiftool) > 0 {
+	if len(exif) > 0 {
 		var (
-			args = append(exiftool, file)
+			args = append(exif, file)
 			cmd  = exec.Command(args[0], args[1:]...)
 		)
 		buf, err := cmd.Output()
@@ -173,16 +263,16 @@ func processFile(file, archive string, exiftool []string, data prospect.Data) er
 	}
 	for i := range files {
 		when, _ := files[i].GetTag(0x0132, nef.Tiff)
-    datadir, metadir, err := mkdirAll(archive, when.Time())
-    if err != nil {
-      return err
-    }
-    ps := createParam(1, filepath.Join(datadir, filepath.Base(file)), RoleNef)
-		if len(meta) > 0 {
-      ps = append(ps, createParam(2, filepath.Join(datadir, metafile), RoleMeta)...)
+		datadir, metadir, err := mkdirAll(archive, when.Time())
+		if err != nil {
+			return err
 		}
-    data.Info.ModTime = when.Time()
-    data.Info.AcqTime = when.Time()
+		ps := createParam(1, filepath.Join(datadir, filepath.Base(file)), RoleNef)
+		if len(meta) > 0 {
+			ps = append(ps, createParam(2, filepath.Join(datadir, metafile), RoleMeta)...)
+		}
+		data.Info.ModTime = when.Time()
+		data.Info.AcqTime = when.Time()
 		data.Info.Parameters = ps
 		ds, err := processImage(datadir, basename, files[i], data)
 		if err != nil {
@@ -194,13 +284,13 @@ func processFile(file, archive string, exiftool []string, data prospect.Data) er
 		params, origin = append(params, appendParams(ds)...), when.Time()
 	}
 
-  datadir, metadir, err := mkdirAll(archive, origin)
-  if err != nil {
-    return err
-  }
-  data.Info.ModTime = origin
-  data.Info.AcqTime = origin
-  data.Info.Parameters = createParam(1, filepath.Join(datadir, filepath.Base(file)), RoleNef)
+	datadir, metadir, err := mkdirAll(archive, origin)
+	if err != nil {
+		return err
+	}
+	data.Info.ModTime = origin
+	data.Info.AcqTime = origin
+	data.Info.Parameters = createParam(1, filepath.Join(datadir, filepath.Base(file)), RoleNef)
 	d, err := processMeta(filepath.Join(datadir, metafile), meta, data)
 	if err != nil {
 		return err
@@ -209,7 +299,7 @@ func processFile(file, archive string, exiftool []string, data prospect.Data) er
 		return err
 	}
 	if i := len(params); len(meta) > 0 {
-    params = append(params, createParam(i, filepath.Join(datadir, metafile), RoleMeta)...)
+		params = append(params, createParam(i, filepath.Join(datadir, metafile), RoleMeta)...)
 	}
 	data.Info.Parameters = params
 	d, err = processNEF(datadir, file, data)
@@ -220,14 +310,14 @@ func processFile(file, archive string, exiftool []string, data prospect.Data) er
 }
 
 func createParam(i int, value, role string) []prospect.Parameter {
-  if i <= 0 {
-    i = 1
-  }
-  var (
-    pref = prospect.MakeParameter(fmt.Sprintf(Ptr, i), value)
-    prol = prospect.MakeParameter(fmt.Sprintf(Role, i), role)
-  )
-  return []prospect.Parameter{pref, prol}
+	if i <= 0 {
+		i = 1
+	}
+	var (
+		pref = prospect.MakeParameter(fmt.Sprintf(Ptr, i), value)
+		prol = prospect.MakeParameter(fmt.Sprintf(Role, i), role)
+	)
+	return []prospect.Parameter{pref, prol}
 }
 
 func appendParams(data []prospect.Data) []prospect.Parameter {
@@ -397,15 +487,15 @@ func writeMeta(dir string, meta prospect.Meta) error {
 }
 
 func mkdirAll(dir string, when time.Time) (string, string, error) {
-  datadir, err := mkdirData(dir, when)
-  if err != nil {
-    return "", "", err
-  }
-  metadir, err := mkdirMeta(dir, when)
-  if err != nil {
-    return "", "", err
-  }
-  return datadir, metadir, nil
+	datadir, err := mkdirData(dir, when)
+	if err != nil {
+		return "", "", err
+	}
+	metadir, err := mkdirMeta(dir, when)
+	if err != nil {
+		return "", "", err
+	}
+	return datadir, metadir, nil
 }
 
 func mkdirData(dir string, when time.Time) (string, error) {
@@ -422,10 +512,10 @@ func mkdirMeta(dir string, when time.Time) (string, error) {
 }
 
 func trimExt(file string) string {
-  return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
+	return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 }
 
 func trimPath(file, archive string) string {
-  file = strings.TrimPrefix(file, filepath.Clean(archive))
-  return filepath.Clean(file)
+	file = strings.TrimPrefix(file, filepath.Clean(archive))
+	return filepath.Clean(file)
 }
