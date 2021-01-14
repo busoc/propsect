@@ -25,7 +25,7 @@ const (
 	RoleMeta = "exif"
 	RoleNef  = "nef"
 	RoleImg  = "image"
-	RoleMov = "video"
+	RoleMov  = "video"
 	RoleData = "data"
 	Ptr      = "ptr.%d.href"
 	Role     = "ptr.%d.role"
@@ -53,53 +53,65 @@ const (
 	TypeDUMP = "parameters dump"
 )
 
+type Settings struct {
+	Datadir string `toml:"data"`
+	Archive string
+	Types   map[string]string
+	Exif    []string
+
+	prospect.Meta `toml:"meta"`
+	prospect.Data `toml:"dataset"`
+}
+
+func Load(file string) (Settings, error) {
+	var (
+		set Settings
+		err error
+	)
+	if err := toml.DecodeFile(file, &set); err != nil {
+		return set, err
+	}
+	set.Datadir, err = filepath.Abs(set.Datadir)
+	if err != nil {
+		return set, err
+	}
+	if err = os.Chdir(set.Archive); err != nil {
+		return set, err
+	}
+	set.Archive = ""
+	set.Data.Experiment = set.Meta.Name
+	return set, nil
+}
+
 func main() {
 	flag.Parse()
 
-	cfg := struct {
-		Datadir string `toml:"data"`
-		Archive string
-		Types   map[string]string
-		Exif    []string
-
-		prospect.Meta `toml:"meta"`
-		prospect.Data `toml:"dataset"`
-	}{}
-	if err := toml.DecodeFile(flag.Arg(0), &cfg); err != nil {
+	set, err := Load(flag.Arg(0))
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	if err := writeMeta(cfg.Archive, cfg.Meta); err != nil {
+	if err := writeMeta(set.Archive, set.Meta); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-
-	cfg.Data.Experiment = cfg.Meta.Name
-	err := filepath.Walk(cfg.Datadir, func(file string, i os.FileInfo, err error) error {
+	err = filepath.Walk(set.Datadir, func(file string, i os.FileInfo, err error) error {
 		if err != nil || i.IsDir() {
 			return err
 		}
-		// var (
-		// 	now = time.Now()
-		// 	ext = filepath.Ext(file)
-		// 	archive = cfg.Types[ext]
-		// )
-		// archive = filepath.Join(cfg.Archive, archive)
-		// archive = filepath.Clean(archive)
 		var (
-			now = time.Now()
-			ext = filepath.Ext(file)
-			archive = filepath.Clean(cfg.Archive)
+			now     = time.Now()
+			ext     = filepath.Ext(file)
 		)
 		switch ext {
 		case ExtMOV, ExtDUMP:
-			err = processOther(file, archive, cfg.Exif, cfg.Data)
+			err = processOther(file, set.Exif, set.Data)
 		case ExtNEF:
-			err = processFile(file, archive, cfg.Exif, cfg.Data)
+			err = processFile(file, set.Exif, set.Data)
 		default:
 		}
-		fmt.Printf("done processing %s -> %s (%s)", file, archive, time.Since(now))
+		fmt.Printf("done processing %s (%s)", file, time.Since(now))
 		fmt.Println()
 		return err
 	})
@@ -109,7 +121,7 @@ func main() {
 	}
 }
 
-func processOther(file, archive string, exif []string, data prospect.Data) error {
+func processOther(file string, exif []string, data prospect.Data) error {
 	var (
 		acq    time.Time
 		mod    time.Time
@@ -147,7 +159,7 @@ func processOther(file, archive string, exif []string, data prospect.Data) error
 	data.Info.ModTime = mod
 	data.Info.Level = 1
 
-	datadir, metadir, err := mkdirAll(archive, acq)
+	datadir, metadir, err := mkdirAll("", acq)
 	if err != nil {
 		return err
 	}
@@ -244,7 +256,7 @@ func copyFile(file, dir string) (string, []byte, error) {
 	return w.Name(), sum.Sum(nil)[:], err
 }
 
-func processFile(file, archive string, exif []string, data prospect.Data) error {
+func processFile(file string, exif []string, data prospect.Data) error {
 	r, err := os.Open(file)
 	if err != nil {
 		return err
@@ -277,7 +289,7 @@ func processFile(file, archive string, exif []string, data prospect.Data) error 
 	}
 	for i := range files {
 		when, _ := files[i].GetTag(0x0132, nef.Tiff)
-		datadir, metadir, err := mkdirAll(archive, when.Time())
+		datadir, metadir, err := mkdirAll("", when.Time())
 		if err != nil {
 			return err
 		}
@@ -298,7 +310,7 @@ func processFile(file, archive string, exif []string, data prospect.Data) error 
 		params, origin = append(params, appendParams(ds)...), when.Time()
 	}
 
-	datadir, metadir, err := mkdirAll(archive, origin)
+	datadir, metadir, err := mkdirAll("", origin)
 	if err != nil {
 		return err
 	}
@@ -313,7 +325,8 @@ func processFile(file, archive string, exif []string, data prospect.Data) error 
 		return err
 	}
 	if i := len(params); len(meta) > 0 {
-		params = append(params, createParamPtr(i, filepath.Join(datadir, metafile), RoleMeta)...)
+		file := filepath.Join(datadir, metafile)
+		params = append(params, createParamPtr(i, file, RoleMeta)...)
 	}
 	data.Info.Parameters = params
 	d, err = processNEF(datadir, file, data)
@@ -321,32 +334,6 @@ func processFile(file, archive string, exif []string, data prospect.Data) error 
 		return err
 	}
 	return writeData(filepath.Join(metadir, filepath.Base(file)), d)
-}
-
-func createParamPtr(i int, value, role string) []prospect.Parameter {
-	if i <= 0 {
-		i = 1
-	}
-	var (
-		pref = prospect.MakeParameter(fmt.Sprintf(Ptr, i), value)
-		prol = prospect.MakeParameter(fmt.Sprintf(Role, i), role)
-	)
-	return []prospect.Parameter{pref, prol}
-}
-
-func appendParams(data []prospect.Data) []prospect.Parameter {
-	params := make([]prospect.Parameter, 0, len(data))
-	for _, d := range data {
-		var (
-			role = RoleImg
-			i    = len(params)
-		)
-		if filepath.Ext(d.Info.File) == ExtDAT {
-			role = RoleData
-		}
-		params = append(params, createParamPtr(i+1, d.Info.File, role)...)
-	}
-	return params
 }
 
 func processMeta(file string, meta []byte, data prospect.Data) (prospect.Data, error) {
@@ -468,6 +455,32 @@ func writeImage(f *nef.File) ([]byte, error) {
 
 func writeBytes(f *nef.File) ([]byte, error) {
 	return f.Bytes()
+}
+
+func createParamPtr(i int, value, role string) []prospect.Parameter {
+	if i <= 0 {
+		i = 1
+	}
+	var (
+		pref = prospect.MakeParameter(fmt.Sprintf(Ptr, i), value)
+		prol = prospect.MakeParameter(fmt.Sprintf(Role, i), role)
+	)
+	return []prospect.Parameter{pref, prol}
+}
+
+func appendParams(data []prospect.Data) []prospect.Parameter {
+	params := make([]prospect.Parameter, 0, len(data))
+	for _, d := range data {
+		var (
+			role = RoleImg
+			i    = len(params)
+		)
+		if filepath.Ext(d.Info.File) == ExtDAT {
+			role = RoleData
+		}
+		params = append(params, createParamPtr(i+1, d.Info.File, role)...)
+	}
+	return params
 }
 
 func writeMultiData(dir string, data []prospect.Data) error {
