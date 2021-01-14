@@ -31,7 +31,7 @@ const (
 	Role     = "ptr.%d.role"
 	SizeX    = "image.x"
 	SizeY    = "image.y"
-	Duration = "duration"
+	Duration = "file.duration"
 )
 
 const (
@@ -145,6 +145,7 @@ func processOther(file, archive string, exif []string, data prospect.Data) error
 	}
 	data.Info.AcqTime = acq
 	data.Info.ModTime = mod
+	data.Info.Level = 1
 
 	datadir, metadir, err := mkdirAll(archive, acq)
 	if err != nil {
@@ -165,7 +166,7 @@ func processOther(file, archive string, exif []string, data prospect.Data) error
 	}
 
 	if length > 0 {
-		p := prospect.makeParameter(Duration, length.String())
+		p := prospect.MakeParameter(Duration, length.String())
 		data.Info.Parameters = append(data.Info.Parameters, p)
 	}
 
@@ -515,8 +516,9 @@ func mkdirData(dir string, when time.Time) (string, error) {
 	var (
 		year = when.Format("2006")
 		doy  = when.Format("002")
+		hour = when.Format("15")
 	)
-	dir = filepath.Join(dir, year, doy)
+	dir = filepath.Join(dir, year, doy, hour)
 	return dir, os.MkdirAll(dir, 0755)
 }
 
