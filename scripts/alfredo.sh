@@ -34,7 +34,8 @@ USER=""
 PASSWD=""
 HOST="localhost:8080"
 PAYLOAD="00-Test"
-while getopts :w:u:p:r:d: OPT; do
+RECURSE=0
+while getopts :w:u:p:r:h:d: OPT; do
 	case $OPT in
 	w)
 	WHAT=${OPTARG^}
@@ -45,8 +46,11 @@ while getopts :w:u:p:r:d: OPT; do
 	p)
 	PASSWD=$OPTARG
 	;;
-	r)
+	h)
 	HOST=$OPTARG
+	;;
+	r)
+	RECURSE=1
 	;;
 	d)
 	DIRECTORY=$OPTARG
@@ -70,8 +74,7 @@ then
 fi
 
 download() {
-	BASE=$1
-	echo "fetching metadata from $BASE"
+	local BASE=$1
 	$CURL -X GET -u "${USER}:${PASSWD}" "$BASE" 2> /dev/null | $JQ -r "$FILTER" | while read LINE; do
 		LINE=${LINE//\"/}
 		ID=$(echo $LINE | $CUT -d "$COMMA" -f 1)
@@ -79,9 +82,8 @@ download() {
 		MIME=$(echo $LINE | $CUT -d "$COMMA" -f 3)
 		TYPE=$(echo $LINE | $CUT -d "$COMMA" -f 4)
 
-		if [ $TYPE == "folder" ]; then
-			NEXT="$BASE/$FILE"
-			download "$NEXT"
+		if [ $RECURSE -eq 1 ] && [ $TYPE == "folder" ]; then
+			download "$BASE/$FILE"
 			continue
 		fi
 		URL="http://${HOST}/${APINODE}?id=${ID}"
