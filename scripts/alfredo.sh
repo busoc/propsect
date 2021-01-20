@@ -92,9 +92,11 @@ download() {
 			download "$BASE/$FILE" "$WHERE"
 			continue
 		fi
-		local URL="http://${HOST}/${APINODE}?id=${ID}"
-		echo "downloading $FILE"
-		$CURL -X GET -H "Accept: ${MIME}" -u "${USER}:${PASSWD}" -o "${DIR}/${FILE}" "${URL}" 2> /dev/null
+		if [ $TYPE == "document" ]; then
+			local URL="http://${HOST}/${APINODE}?id=${ID}"
+			echo "downloading $FILE"
+			$CURL -X GET -H "Accept: ${MIME}" -u "${USER}:${PASSWD}" -o "${DIR}/${FILE}" "${URL}" 2> /dev/null
+		fi
 	done
 }
 
