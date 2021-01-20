@@ -75,6 +75,7 @@ fi
 
 download() {
 	local BASE=$1
+	local DIR=$2
 	$CURL -X GET -u "${USER}:${PASSWD}" "$BASE" 2> /dev/null | $JQ -r "$FILTER" | while read LINE; do
 		LINE=${LINE//\"/}
 		ID=$(echo $LINE | $CUT -d "$COMMA" -f 1)
@@ -83,13 +84,18 @@ download() {
 		TYPE=$(echo $LINE | $CUT -d "$COMMA" -f 4)
 
 		if [ $RECURSE -eq 1 ] && [ $TYPE == "folder" ]; then
-			download "$BASE/$FILE"
+			local WHERE="$DIR/$FILE"
+			mkdir -p $WHERE
+			if [ $? -ne 0 ]; then
+				return
+			fi
+			download "$BASE/$FILE" "$WHERE"
 			continue
 		fi
-		URL="http://${HOST}/${APINODE}?id=${ID}"
+		local URL="http://${HOST}/${APINODE}?id=${ID}"
 		echo "downloading $FILE"
-		$CURL -X GET -H "Accept: ${MIME}" -u "${USER}:${PASSWD}" -o "${DIRECTORY}/${FILE}" "${URL}" 2> /dev/null
+		$CURL -X GET -H "Accept: ${MIME}" -u "${USER}:${PASSWD}" -o "${DIR}/${FILE}" "${URL}" 2> /dev/null
 	done
 }
 
-download "http://${HOST}/${APILIST}/${PAYLOAD}/${WHAT}"
+download "http://${HOST}/${APILIST}/${PAYLOAD}/${WHAT}" "$DIRECTORY"
