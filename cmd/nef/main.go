@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -53,11 +54,17 @@ const (
 	TypeDUMP = "parameters dump"
 )
 
+type FileInfo struct {
+	Ext string
+	Mime string
+	Type string
+}
+
 type Settings struct {
 	Datadir string `toml:"data"`
 	Archive string
-	Types   map[string]string
 	Exif    []string
+	Infos []FileInfo `toml:"types"`
 
 	prospect.Meta `toml:"meta"`
 	prospect.Data `toml:"dataset"`
@@ -115,6 +122,7 @@ func main() {
 		case ExtNEF:
 			err = processFile(file, set.Exif, set.Data)
 		default:
+			// err = processOther(file, set.Infos, set.Data)
 		}
 		fmt.Printf("done processing %s (%s)", file, time.Since(now))
 		fmt.Println()
@@ -124,6 +132,34 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(3)
 	}
+}
+
+func processOther(file string, types []FileInfo, data prospect.Data) error {
+	ext := filepath.Ext(file)
+	x := sort.Search(len(types), func(i int) bool {
+		return types[i].Ext >= ext
+	})
+	if x >= len(types) || types[x].Ext != ext {
+		return nil
+	}
+	data.Info.Mime = types[x].Mime
+	data.Info.Type = types[x].Type
+	data.Info.Level = 1
+
+	r, err := os.Open(file)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	digest := sha256.New()
+	if _, err := io.Copy(digest, r); err != nil {
+		return err
+	}
+	data.Info.File = file
+	data.Info.Integrity = SHA
+	data.Info.Sum = fmt.Sprintf("%x", digest.Sum(nil))
+	return nil
 }
 
 func processMov(file string, exif []string, data prospect.Data) error {
