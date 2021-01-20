@@ -1,14 +1,11 @@
 #! /bin/bash
 
-USER=""
-PASSWD=""
-HOST=""
+COMMA=","
 APILIST="alfresco/api/-default-/public/cmis/versions/1.1/browser/root/Sites/busoc-ops/documentLibrary/10-DATA%20PRESERVATION"
 APINODE="alfresco/api/-default-/public/cmis/versions/1.1/atom/content"
 CURL="$(which curl)"
 JQ="$(which jq)"
 CUT="$(which cut)"
-FILTER='.objects[].object.properties | select(."cmis:objectTypeId"="cmis:document") | [(."cmis:objectId".value | split(";")[0]), ."cmis:name".value, ."cmis:contentStreamMimeType".value] | @csv'
 
 if [ ! -x $CURL ];
 then
@@ -28,13 +25,43 @@ then
 	exit 1
 fi
 
-PAYLOAD=$1
-DIRECTORY=$2
+FILTER='.objects[].object.properties | [(."cmis:objectId".value | split(";")[0]), ."cmis:name".value, ."cmis:contentStreamMimeType".value, (."cmis:objectTypeId".value | split(":")[1])] | @csv'
+# FILTER='.objects[].object.properties | select(."cmis:objectTypeId"="cmis:document") | [(."cmis:objectId".value | split(";")[0]), ."cmis:name".value, ."cmis:contentStreamMimeType".value] | @csv'
 
-if [ -z $DIRECTORY ];
-then
-	DIRECTORY="${PWD}/${PAYLOAD}"
-fi
+DIRECTORY="$PWD"
+WHAT=""
+USER=""
+PASSWD=""
+HOST="localhost:8080"
+PAYLOAD="00-Test"
+while getopts :w:u:p:r:d: OPT; do
+	case $OPT in
+	w)
+	WHAT=${OPTARG^}
+	;;
+	u)
+	USER=$OPTARG
+	;;
+	p)
+	PASSWD=$OPTARG
+	;;
+	r)
+	HOST=$OPTARG
+	;;
+	d)
+	DIRECTORY=$OPTARG
+	;;
+	*)
+	echo "$OPT not defined"
+	echo "usage: $(basename $0) [-w what] [-u user] [-p passwd] [-r host] [-d directory] <remote directory>"
+	exit 3
+	;;
+	esac
+done
+shift $(($OPTIND - 1))
+PAYLOAD=$1
+
+
 mkdir -p $DIRECTORY 2> /dev/null
 if [ $? -ne 0 ];
 then
@@ -42,14 +69,25 @@ then
 	exit 2
 fi
 
-COMMA=","
-URL="http://${HOST}/${APILIST}/${PAYLOAD}/Documents"
-$CURL -X GET -u "${USER}:${PASSWD}" "$URL" 2> /dev/null | $JQ -r "$FILTER" | while read LINE; do
-	LINE=${LINE//\"/}
-	ID=$(echo $LINE | $CUT -d "$COMMA" -f 1)
-	FILE=$(echo $LINE | $CUT -d "$COMMA" -f 2)
-	MIME=$(echo $LINE | $CUT -d "$COMMA" -f 3)
+download() {
+	BASE=$1
+	echo "fetching metadata from $BASE"
+	$CURL -X GET -u "${USER}:${PASSWD}" "$BASE" 2> /dev/null | $JQ -r "$FILTER" | while read LINE; do
+		LINE=${LINE//\"/}
+		ID=$(echo $LINE | $CUT -d "$COMMA" -f 1)
+		FILE=$(echo $LINE | $CUT -d "$COMMA" -f 2)
+		MIME=$(echo $LINE | $CUT -d "$COMMA" -f 3)
+		TYPE=$(echo $LINE | $CUT -d "$COMMA" -f 4)
 
-	URL="http://${HOST}/${APINODE}?id=${ID}"
-	$CURL -X GET -H "Accept: ${MIME}" -u "${USER}:${PASSWD}" -o "${DIRECTORY}/${FILE}" "${URL}" 2> /dev/null
-done
+		if [ $TYPE == "folder" ]; then
+			NEXT="$BASE/$FILE"
+			download "$NEXT"
+			continue
+		fi
+		URL="http://${HOST}/${APINODE}?id=${ID}"
+		echo "downloading $FILE"
+		$CURL -X GET -H "Accept: ${MIME}" -u "${USER}:${PASSWD}" -o "${DIRECTORY}/${FILE}" "${URL}" 2> /dev/null
+	done
+}
+
+download "http://${HOST}/${APILIST}/${PAYLOAD}/${WHAT}"
