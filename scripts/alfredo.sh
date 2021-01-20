@@ -25,7 +25,7 @@ then
 	exit 1
 fi
 
-FILTER='.objects[].object.properties | [(."cmis:objectId".value | split(";")[0]), ."cmis:name".value, ."cmis:contentStreamMimeType".value, (."cmis:objectTypeId".value | split(":")[1])] | @csv'
+FILTER='.objects[].object.properties | [(."cmis:objectId".value | split(";")[0]), ."cmis:contentStreamFileName".value, ."cmis:contentStreamMimeType".value, (."cmis:objectTypeId".value | split(":")[1])] | @csv'
 # FILTER='.objects[].object.properties | select(."cmis:objectTypeId"="cmis:document") | [(."cmis:objectId".value | split(";")[0]), ."cmis:name".value, ."cmis:contentStreamMimeType".value] | @csv'
 
 DIRECTORY="$PWD"
@@ -35,7 +35,7 @@ PASSWD=""
 HOST="localhost:8080"
 PAYLOAD="00-Test"
 RECURSE=0
-while getopts :w:u:p:r:h:d: OPT; do
+while getopts :w:u:p:rh:d: OPT; do
 	case $OPT in
 	w)
 	WHAT=${OPTARG^}
@@ -78,10 +78,10 @@ download() {
 	local DIR=$2
 	$CURL -X GET -u "${USER}:${PASSWD}" "$BASE" 2> /dev/null | $JQ -r "$FILTER" | while read LINE; do
 		LINE=${LINE//\"/}
-		ID=$(echo $LINE | $CUT -d "$COMMA" -f 1)
-		FILE=$(echo $LINE | $CUT -d "$COMMA" -f 2)
-		MIME=$(echo $LINE | $CUT -d "$COMMA" -f 3)
-		TYPE=$(echo $LINE | $CUT -d "$COMMA" -f 4)
+		local ID=$(echo $LINE | $CUT -d "$COMMA" -f 1)
+		local FILE=$(echo $LINE | $CUT -d "$COMMA" -f 2)
+		local MIME=$(echo $LINE | $CUT -d "$COMMA" -f 3)
+		local TYPE=$(echo $LINE | $CUT -d "$COMMA" -f 4)
 
 		if [ $RECURSE -eq 1 ] && [ $TYPE == "folder" ]; then
 			local WHERE="$DIR/$FILE"
@@ -93,6 +93,7 @@ download() {
 			continue
 		fi
 		if [ $TYPE == "document" ]; then
+			FILE=${FILE// /_}
 			local URL="http://${HOST}/${APINODE}?id=${ID}"
 			echo "downloading $FILE"
 			$CURL -X GET -H "Accept: ${MIME}" -u "${USER}:${PASSWD}" -o "${DIR}/${FILE}" "${URL}" 2> /dev/null
