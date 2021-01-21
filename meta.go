@@ -2,18 +2,21 @@ package prospect
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 )
 
 const (
-	ptrRef = "ptr.%d.href"
-	ptrRole = "ptr.%d.role"
+	ptrRef   = "ptr.%d.href"
+	ptrRole  = "ptr.%d.role"
 	fileSize = "file.size"
-	fileMD5 = "file.md5"
+	fileMD5  = "file.md5"
 )
 
 type Increment struct {
@@ -89,6 +92,84 @@ func (m Meta) MarshalXML(e *xml.Encoder, _ xml.StartElement) error {
 type Link struct {
 	File string
 	Role string
+}
+
+type Archive struct {
+	DataDir string `toml:"datadir"`
+	MetaDir string `toml:"metadir"`
+}
+
+func (a Archive) Store(d Data, pattern string) error {
+	r, err := ParseResolver(pattern)
+	if err != nil {
+		return err
+	}
+	file := filepath.Join(r.Resolve(d), filepath.Base(d.File))
+	if err := a.storeLink(d, file); err != nil {
+		return err
+	}
+	return a.storeMeta(d, file)
+}
+
+func (a Archive) storeMeta(d Data, file string) error {
+	d.File = file
+	file = filepath.Join(a.MetaDir, file)
+	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+		return err
+	}
+	w, err := os.Create(file + ".xml")
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+	return EncodeData(w, d)
+}
+
+func (a Archive) storeLink(d Data, file string) error {
+	file = filepath.Join(a.DataDir, file)
+	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+		return err
+	}
+	err := os.Link(d.File, file)
+	if errors.Is(err, os.ErrExist) {
+		err = nil
+	}
+	return err
+}
+
+type Context struct {
+	Experiment string
+	Model      string
+	Source     string
+	Owner      string
+
+	Increments []Increment `toml:"increment"`
+	Metadata   []Parameter
+}
+
+func (c Context) Update(d Data) Data {
+	if d.Experiment == "" {
+		d.Experiment = c.Experiment
+	}
+	if d.Source == "" {
+		d.Source = c.Source
+	}
+	if d.Model == "" {
+		d.Model = c.Model
+	}
+	if d.Owner == "" {
+		d.Owner = c.Owner
+	}
+	if len(d.Increments) == 0 && len(c.Increments) > 0 {
+		x := sort.Search(len(c.Increments), func(i int) bool {
+			return c.Increments[i].Contains(d.AcqTime)
+		})
+		if x < len(c.Increments) && c.Increments[x].Contains(d.AcqTime) {
+			d.Increments = append(d.Increments, c.Increments[x].Num)
+		}
+	}
+	d.Parameters = append(d.Parameters, c.Metadata...)
+	return d
 }
 
 type Data struct {

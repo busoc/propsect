@@ -48,10 +48,14 @@ const (
 	MimeNEF  = "image/x-nikon-nef"
 	MimeMOV  = "video/quicktime"
 	MimeDUMP = "text/csv;comma=tab"
+	MimePlain = "text/plain"
+	MimeJPG = "image/jpeg"
 	TypeNEF  = "raw image"
 	TypeExif = "exif tags listing"
 	TypeMOV  = "video"
 	TypeDUMP = "parameters dump"
+	TypeData = "data"
+	TypeImage = "image"
 )
 
 type FileInfo struct {
@@ -142,9 +146,9 @@ func processOther(file string, types []FileInfo, data prospect.Data) error {
 	if x >= len(types) || types[x].Ext != ext {
 		return nil
 	}
-	data.Info.Mime = types[x].Mime
-	data.Info.Type = types[x].Type
-	data.Info.Level = 1
+	data.Mime = types[x].Mime
+	data.Type = types[x].Type
+	data.Level = 1
 
 	r, err := os.Open(file)
 	if err != nil {
@@ -156,22 +160,22 @@ func processOther(file string, types []FileInfo, data prospect.Data) error {
 	if _, err := io.Copy(digest, r); err != nil {
 		return err
 	}
-	data.Info.File = file
-	data.Info.Integrity = SHA
-	data.Info.Sum = fmt.Sprintf("%x", digest.Sum(nil))
+	data.File = file
+	data.Integrity = SHA
+	data.Sum = fmt.Sprintf("%x", digest.Sum(nil))
 	return nil
 }
 
 func processMov(file string, exif []string, data prospect.Data) error {
-	data.Info.Mime = MimeMOV
-	data.Info.Type = TypeMOV
+	data.Mime = MimeMOV
+	data.Type = TypeMOV
 	acq, mod, length, err := timesFromMov(file)
 	if err != nil {
 		return err
 	}
-	data.Info.AcqTime = acq
-	data.Info.ModTime = mod
-	data.Info.Level = 1
+	data.AcqTime = acq
+	data.ModTime = mod
+	data.Level = 1
 
 	var meta []byte
 	if len(exif) > 0 {
@@ -191,7 +195,7 @@ func processMov(file string, exif []string, data prospect.Data) error {
 	}
 
 	if len(meta) > 0 {
-		data.Info.Parameters = createParamPtr(1, filepath.Join(datadir, file), RoleMov)
+		data.Parameters = createParamPtr(1, filepath.Join(datadir, file), RoleMov)
 		basename := trimExt(file) + ".exif" + ExtTXT
 		d, err := processMeta(filepath.Join(datadir, basename), meta, data)
 		if err != nil {
@@ -200,34 +204,34 @@ func processMov(file string, exif []string, data prospect.Data) error {
 		if err := writeData(filepath.Join(metadir, basename), d); err != nil {
 			return err
 		}
-		data.Info.Parameters = createParamPtr(1, filepath.Join(datadir, basename), RoleMeta)
+		data.Parameters = createParamPtr(1, filepath.Join(datadir, basename), RoleMeta)
 	}
 
 	if length > 0 {
 		p := prospect.MakeParameter(Duration, length.String())
-		data.Info.Parameters = append(data.Info.Parameters, p)
+		data.Parameters = append(data.Parameters, p)
 	}
 
 	filename, sum, err := copyFile(file, datadir)
 	if err != nil {
 		return err
 	}
-	data.Info.File = filename
-	data.Info.Integrity = SHA
-	data.Info.Sum = fmt.Sprintf("%x", sum)
+	data.File = filename
+	data.Integrity = SHA
+	data.Sum = fmt.Sprintf("%x", sum)
 	return writeData(filepath.Join(metadir, filepath.Base(file)), data)
 }
 
 func processDump(file string, data prospect.Data) error {
-	data.Info.Mime = MimeDUMP
-	data.Info.Type = TypeDUMP
+	data.Mime = MimeDUMP
+	data.Type = TypeDUMP
 	acq, mod, length, err := timesFromDump(file)
 	if err != nil {
 		return err
 	}
-	data.Info.AcqTime = acq
-	data.Info.ModTime = mod
-	data.Info.Level = 1
+	data.AcqTime = acq
+	data.ModTime = mod
+	data.Level = 1
 
 	datadir, metadir, err := mkdirAll("", acq)
 	if err != nil {
@@ -236,16 +240,16 @@ func processDump(file string, data prospect.Data) error {
 
 	if length > 0 {
 		p := prospect.MakeParameter(Duration, length.String())
-		data.Info.Parameters = append(data.Info.Parameters, p)
+		data.Parameters = append(data.Parameters, p)
 	}
 
 	filename, sum, err := copyFile(file, datadir)
 	if err != nil {
 		return err
 	}
-	data.Info.File = filename
-	data.Info.Integrity = SHA
-	data.Info.Sum = fmt.Sprintf("%x", sum)
+	data.File = filename
+	data.Integrity = SHA
+	data.Sum = fmt.Sprintf("%x", sum)
 	return writeData(filepath.Join(metadir, filepath.Base(file)), data)
 }
 
@@ -354,9 +358,9 @@ func processFile(file string, exif []string, data prospect.Data) error {
 		if len(meta) > 0 {
 			ps = append(ps, createParamPtr(2, filepath.Join(datadir, metafile), RoleMeta)...)
 		}
-		data.Info.ModTime = when.Time()
-		data.Info.AcqTime = when.Time()
-		data.Info.Parameters = ps
+		data.ModTime = when.Time()
+		data.AcqTime = when.Time()
+		data.Parameters = ps
 		ds, err := processImage(datadir, basename, files[i], data)
 		if err != nil {
 			return err
@@ -371,9 +375,9 @@ func processFile(file string, exif []string, data prospect.Data) error {
 	if err != nil {
 		return err
 	}
-	data.Info.ModTime = origin
-	data.Info.AcqTime = origin
-	data.Info.Parameters = createParamPtr(1, filepath.Join(datadir, filepath.Base(file)), RoleNef)
+	data.ModTime = origin
+	data.AcqTime = origin
+	data.Parameters = createParamPtr(1, filepath.Join(datadir, filepath.Base(file)), RoleNef)
 	d, err := processMeta(filepath.Join(datadir, metafile), meta, data)
 	if err != nil {
 		return err
@@ -385,7 +389,7 @@ func processFile(file string, exif []string, data prospect.Data) error {
 		file := filepath.Join(datadir, metafile)
 		params = append(params, createParamPtr(i, file, RoleMeta)...)
 	}
-	data.Info.Parameters = params
+	data.Parameters = params
 	d, err = processNEF(datadir, file, data)
 	if err != nil {
 		return err
@@ -397,11 +401,11 @@ func processMeta(file string, meta []byte, data prospect.Data) (prospect.Data, e
 	if err := ioutil.WriteFile(file, meta, 0644); err != nil {
 		return data, err
 	}
-	data.Info.File = file
-	data.Info.Integrity = SHA
-	data.Info.Sum = fmt.Sprintf("%x", sha256.Sum256(meta))
-	data.Info.Mime = prospect.MimePlainDefault
-	data.Info.Type = TypeExif
+	data.File = file
+	data.Integrity = SHA
+	data.Sum = fmt.Sprintf("%x", sha256.Sum256(meta))
+	data.Mime = MimePlain
+	data.Type = TypeExif
 
 	return data, nil
 }
@@ -426,16 +430,14 @@ func processNEF(dir, file string, data prospect.Data) (prospect.Data, error) {
 		sum = sha256.New()
 		ws  = io.MultiWriter(sum, w)
 	)
-	size, err := io.Copy(ws, r)
-	if err != nil {
+	if data.Size, err = io.Copy(ws, r); err != nil {
 		return data, err
 	}
-	data.Info.Size = int(size)
-	data.Info.File = w.Name()
-	data.Info.Integrity = SHA
-	data.Info.Sum = fmt.Sprintf("%x", sum.Sum(nil))
-	data.Info.Mime = MimeNEF
-	data.Info.Type = TypeNEF
+	data.File = w.Name()
+	data.Integrity = SHA
+	data.Sum = fmt.Sprintf("%x", sum.Sum(nil))
+	data.Mime = MimeNEF
+	data.Type = TypeNEF
 
 	return data, nil
 }
@@ -459,10 +461,10 @@ func processImage(dir, base string, f *nef.File, data prospect.Data) ([]prospect
 }
 
 func extractImage(dir, base string, f *nef.File, data prospect.Data) (prospect.Data, error) {
-	data.Info.Type = prospect.TypeImage
-	data.Info.Mime = prospect.MimeJPG
-	data.Info.Level = 1
-	data.Info.Integrity = SHA
+	data.Type = TypeImage
+	data.Mime = MimeJPG
+	data.Level = 1
+	data.Integrity = SHA
 
 	var (
 		buf []byte
@@ -470,9 +472,9 @@ func extractImage(dir, base string, f *nef.File, data prospect.Data) (prospect.D
 		ext string
 	)
 	if !f.IsSupported() {
-		data.Info.Mime = prospect.MimeJPG
-		data.Info.Type = prospect.TypeData
-		data.Info.Level = 0
+		data.Mime = MimeJPG
+		data.Type = TypeData
+		data.Level = 0
 
 		buf, err = writeBytes(f)
 		ext = ExtDAT
@@ -482,19 +484,19 @@ func extractImage(dir, base string, f *nef.File, data prospect.Data) (prospect.D
 
 		cfg, _ := jpeg.DecodeConfig(bytes.NewReader(buf))
 		ps := []prospect.Parameter{
-			prospect.MakeParameter(SizeX, fmt.Sprintf("%d", cfg.Width)),
-			prospect.MakeParameter(SizeY, fmt.Sprintf("%d", cfg.Height)),
+			prospect.MakeParameter(SizeX, cfg.Width),
+			prospect.MakeParameter(SizeY, cfg.Height),
 		}
-		data.Info.Parameters = append(data.Info.Parameters, ps...)
+		data.Parameters = append(data.Parameters, ps...)
 	}
 	if err != nil {
 		return data, err
 	}
-	data.Info.Size = len(buf)
-	data.Info.Sum = fmt.Sprintf("%x", sha256.Sum256(buf))
-	data.Info.File = filepath.Join(dir, base+"_"+f.Filename()) + ext
+	data.Size = int64(len(buf))
+	data.Sum = fmt.Sprintf("%x", sha256.Sum256(buf))
+	data.File = filepath.Join(dir, base+"_"+f.Filename()) + ext
 
-	if err := ioutil.WriteFile(data.Info.File, buf, 0644); err != nil {
+	if err := ioutil.WriteFile(data.File, buf, 0644); err != nil {
 		return data, err
 	}
 	return data, nil
@@ -532,17 +534,17 @@ func appendParams(data []prospect.Data) []prospect.Parameter {
 			role = RoleImg
 			i    = len(params)
 		)
-		if filepath.Ext(d.Info.File) == ExtDAT {
+		if filepath.Ext(d.File) == ExtDAT {
 			role = RoleData
 		}
-		params = append(params, createParamPtr(i+1, d.Info.File, role)...)
+		params = append(params, createParamPtr(i+1, d.File, role)...)
 	}
 	return params
 }
 
 func writeMultiData(dir string, data []prospect.Data) error {
 	for _, d := range data {
-		if err := writeData(filepath.Join(dir, filepath.Base(d.Info.File)), d); err != nil {
+		if err := writeData(filepath.Join(dir, filepath.Base(d.File)), d); err != nil {
 			return err
 		}
 	}

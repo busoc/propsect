@@ -12,6 +12,18 @@ type Resolver interface {
 	fmt.Stringer
 }
 
+type Pattern struct {
+	Resolver
+}
+
+func (p *Pattern) Set(str string) error {
+	r, err := ParseResolver(str)
+	if err == nil {
+		p.Resolver = r
+	}
+	return err
+}
+
 func ParseResolver(str string) (Resolver, error) {
 	if str == "" {
 		return empty{}, nil
