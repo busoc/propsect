@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+  "log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -134,13 +135,16 @@ func main() {
 		os.Exit(1)
 	}
 	for _, d := range c.Data {
+    log.Printf("start processing %s", d.File)
 		d = c.Default.Update(d)
 		if err := d.Update(); err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			log.Printf("update %s: %s", d.File, err)
 			continue
 		}
 		if err := c.Store(d); err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			log.Printf("storing %s: %s", d.File, err)
+      continue
 		}
+    log.Printf("done %s", d.File)
 	}
 }
