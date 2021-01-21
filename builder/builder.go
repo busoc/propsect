@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/boltdb/bolt"
+	"github.com/busoc/prospect"
 	"github.com/midbel/toml"
 )
 
@@ -37,7 +38,7 @@ type Builder struct {
 	marshaler
 }
 
-func NewBuilder(file, schedule string) (*Builder, error) {
+func New(file, schedule string) (*Builder, error) {
 	c := struct {
 		Archive string
 		Dry     bool `toml:"no-data"`
