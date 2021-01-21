@@ -1,11 +1,9 @@
 package prospect
 
 import (
-	"encoding/csv"
 	"encoding/xml"
 	"errors"
 	"io"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -46,121 +44,8 @@ type Payload struct {
 	Class   int      `xml:"payloadClass"`
 }
 
-type Schedule struct {
-	source string
-	as     []Activity
-}
-
-func loadSchedule(file string, starts, ends time.Time) (Schedule, error) {
-	if file == "" {
-		return Schedule{}, nil
-	}
-
-	r, err := os.Open(file)
-	if err != nil {
-		return Schedule{}, err
-	}
-	defer r.Close()
-
-	stamp := func(dt string) (time.Time, error) {
-		var (
-			err  error
-			when time.Time
-		)
-		for _, f := range timePattern {
-			when, err = time.Parse(f, dt)
-			if err == nil {
-				when = when.UTC()
-				break
-			}
-		}
-		return when, err
-	}
-
-	var (
-		as = make([]Activity, 0, 100)
-		rs = csv.NewReader(r)
-	)
-	for {
-		switch row, err := rs.Read(); err {
-		case nil:
-			var a Activity
-			if a.Starts, err = stamp(row[0]); err != nil {
-				return Schedule{}, err
-			}
-			if a.Ends, err = stamp(row[1]); err != nil {
-				return Schedule{}, err
-			}
-			a.Type, a.Comment = row[3], row[4]
-			if (a.Starts.Equal(starts) || a.Starts.After(starts)) && (a.Ends.Equal(ends) || a.Ends.Before(ends)) {
-				as = append(as, a)
-			}
-		case io.EOF:
-			sort.Slice(as, func(i, j int) bool {
-				return as[i].Starts.Before(as[j].Starts)
-			})
-			return Schedule{as: as}, nil
-		default:
-			return Schedule{}, err
-		}
-	}
-}
-
-func (s Schedule) Keep(i FileInfo) (string, []Parameter) {
-	if i.AcqTime.IsZero() {
-		return "", nil
-	}
-	if len(s.as) == 0 {
-		return DefaultSource, nil
-	}
-	ix := sort.Search(len(s.as), func(j int) bool {
-		return s.as[j].Starts.Before(i.AcqTime) && s.as[j].Ends.After(i.AcqTime)
-	})
-	if ix < len(s.as) {
-		var (
-			act = s.as[ix]
-			src = act.Type
-		)
-		if src == "" {
-			src = DefaultSource
-		}
-		ps := make([]Parameter, 0, 3)
-		ps = append(ps, MakeParameter(activityStarts, act.Starts.Format(time.RFC3339)))
-		ps = append(ps, MakeParameter(activityEnds, act.Ends.Format(time.RFC3339)))
-		if act.Comment != "" {
-			ps = append(ps, MakeParameter(activityDesc, act.Comment))
-		}
-		return src, ps
-	}
-	return "", nil
-}
-
-const (
-	activityStarts = "activity.dtstart"
-	activityEnds   = "activity.dtend"
-	activityDesc   = "activity.description"
-)
-
-type Activity struct {
-	Comment string
-	Type    string
-	Starts  time.Time
-	Ends    time.Time
-}
-
-func (a Activity) IsZero() bool {
-	return a.Starts.IsZero() || a.Ends.IsZero()
-}
-
-func (a Activity) Keep(i FileInfo) string {
-	if !i.AcqTime.IsZero() && (a.Starts.Before(i.AcqTime) && a.Ends.After(i.AcqTime)) {
-		return a.Type
-	}
-	return ""
-}
-
 type Meta struct {
-	Id   int    `xml:"-"`
+	Id   int
 	Accr string `toml:"acronym" xml:",comment"`
 
 	Name       string    `toml:"experiment"`
