@@ -147,6 +147,6 @@ func main() {
 			log.Printf("storing %s: %s", d.File, err)
       continue
 		}
-    log.Printf("done %s (%d - %s - %x)", d.File, d.Size, time.Since(now), d.Sum)
+    log.Printf("done %s (%d - %s - %x)", d.File, d.Size, time.Since(now), d.MD5)
 	}
 }

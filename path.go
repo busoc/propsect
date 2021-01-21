@@ -120,7 +120,7 @@ func parseResolver(str string) (Resolver, error) {
 type empty struct{}
 
 func (e empty) Resolve(d Data) string {
-	return filepath.Base(d.File)
+	return "" //filepath.Base(d.File)
 }
 
 func (e empty) String() string {
