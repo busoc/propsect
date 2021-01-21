@@ -19,7 +19,7 @@ const (
 type Increment struct {
 	Starts time.Time
 	Ends   time.Time
-	Num    int `toml:"increment"`
+	Num    string `toml:"increment"`
 }
 
 func (i Increment) Contains(t time.Time) bool {
@@ -101,7 +101,7 @@ type Data struct {
 	Model      string // FM, EM,...
 	Crews      []string
 	Owner      string
-	Increments []int
+	Increments []string
 	Mime       string
 	File       string
 	ModTime    time.Time
@@ -122,7 +122,7 @@ func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
 	e.EncodeElement(d.AcqTime.Format(time.RFC3339), startElement("acquisitionTime"))
 	e.EncodeElement(d.ModTime.Format(time.RFC3339), startElement("creationTime"))
 	is := struct {
-		Values []int `xml:"increment"`
+		Values []string `xml:"increment"`
 	}{
 		Values: d.Increments,
 	}
