@@ -7,12 +7,17 @@ import (
 	"strings"
 )
 
-func Parse(str string) (resolver, error) {
+type Resolver interface {
+	Resolve(Data) string
+	fmt.Stringer
+}
+
+func ParseResolver(str string) (Resolver, error) {
 	if str == "" {
 		return empty{}, nil
 	}
 	var (
-		rs    []resolver
+		rs    []Resolver
 		parts = strings.Split(strings.Trim(str, "/"), "/")
 	)
 	for _, p := range parts {
@@ -50,10 +55,10 @@ const (
 	levelStamp  = "timestamp"
 )
 
-func parse(str string) (resolver, error) {
+func parse(str string) (Resolver, error) {
 	var (
 		offset int
-		rs     []resolver
+		rs     []Resolver
 	)
 	for offset < len(str) {
 		start := strings.IndexByte(str[offset:], lcurly)
@@ -72,7 +77,6 @@ func parse(str string) (resolver, error) {
 			rs = append(rs, literal(q))
 		}
 		offset += start + 1
-		// rs = append(rs, fragment{name: str[offset : offset+end-1]})
 		r, err := parseResolver(str[offset : offset+end-1])
 		if err != nil {
 			return nil, err
@@ -92,7 +96,7 @@ func parse(str string) (resolver, error) {
 	return compound{rs: rs}, nil
 }
 
-func parseResolver(str string) (resolver, error) {
+func parseResolver(str string) (Resolver, error) {
 	var err error
 	if !(isNumber(str[0]) || isSign(str[0])) {
 		return fragment{name: str}, err
@@ -113,15 +117,10 @@ func parseResolver(str string) (resolver, error) {
 	return i, err
 }
 
-type resolver interface {
-	Resolve(Data) string
-	fmt.Stringer
-}
-
 type empty struct{}
 
 func (e empty) Resolve(d Data) string {
-	return d.Info.File
+	return d.File
 }
 
 func (e empty) String() string {
@@ -129,7 +128,7 @@ func (e empty) String() string {
 }
 
 type path struct {
-	rs []resolver
+	rs []Resolver
 }
 
 func (p path) Resolve(dat Data) string {
@@ -164,7 +163,7 @@ type index struct {
 
 func (i index) Resolve(dat Data) string {
 	var (
-		dir = filepath.Dir(dat.Info.File)
+		dir = filepath.Dir(dat.File)
 		xs  = strings.Split(strings.TrimPrefix(dir, "/"), "/")
 		str string
 	)
@@ -185,7 +184,7 @@ type slice struct {
 
 func (i slice) Resolve(dat Data) string {
 	var (
-		dir   = filepath.Dir(dat.Info.File)
+		dir   = filepath.Dir(dat.File)
 		xs    = strings.Split(strings.TrimPrefix(dir, "/"), "/")
 		begin = normalize(i.begin, len(xs))
 		end   = normalize(i.end, len(xs))
@@ -246,9 +245,8 @@ func (f fragment) Resolve(dat Data) string {
 				str = xs[x]
 			}
 		}
-		// str = "unknown"
 	case levelRun:
-		str = dat.Info.Run
+		str = dat.Source
 	case levelLevel:
 		str = strconv.Itoa(dat.Level)
 	case levelSource:
@@ -256,26 +254,25 @@ func (f fragment) Resolve(dat Data) string {
 	case levelModel:
 		str = replace(dat.Model)
 	case levelMime, levelFormat:
-		str = replace(splitMime(dat.Info.Mime))
+		str = replace(splitMime(dat.Mime))
 	case levelType:
-		str = replace(dat.Info.Type)
+		str = replace(dat.Type)
 	case levelYear:
-		str = strconv.Itoa(dat.Info.AcqTime.Year())
+		str = strconv.Itoa(dat.AcqTime.Year())
 	case levelDoy:
-		str = fmt.Sprintf("%03d", dat.Info.AcqTime.YearDay())
+		str = fmt.Sprintf("%03d", dat.AcqTime.YearDay())
 	case levelMonth:
-		str = fmt.Sprintf("%02d", dat.Info.AcqTime.Month())
+		str = fmt.Sprintf("%02d", dat.AcqTime.Month())
 	case levelDay:
-		str = fmt.Sprintf("%02d", dat.Info.AcqTime.Day())
+		str = fmt.Sprintf("%02d", dat.AcqTime.Day())
 	case levelHour:
-		str = fmt.Sprintf("%02d", dat.Info.AcqTime.Hour())
+		str = fmt.Sprintf("%02d", dat.AcqTime.Hour())
 	case levelMin:
-		str = fmt.Sprintf("%02d", dat.Info.AcqTime.Minute())
+		str = fmt.Sprintf("%02d", dat.AcqTime.Minute())
 	case levelSec:
-		str = fmt.Sprintf("%02d", dat.Info.AcqTime.Second())
+		str = fmt.Sprintf("%02d", dat.AcqTime.Second())
 	case levelStamp:
-		u := dat.Info.AcqTime.Unix()
-		str = strconv.Itoa(int(u))
+		str = strconv.Itoa(int(dat.AcqTime.Unix()))
 	}
 	return str
 }
@@ -285,7 +282,7 @@ func (f fragment) String() string {
 }
 
 type compound struct {
-	rs []resolver
+	rs []Resolver
 }
 
 func (c compound) Resolve(dat Data) string {

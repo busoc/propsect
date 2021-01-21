@@ -2,37 +2,39 @@ package prospect
 
 import (
 	"encoding/xml"
-	"errors"
+	"fmt"
 	"io"
 	"sort"
 	"strings"
 	"time"
 )
 
-var timePattern = []string{
-	"2006/01/02 15:04:00",
-	"2006-01-02 15:04:00",
+const (
+	ptrRef = "ptr.%d.href"
+	ptrRole = "ptr.%d.role"
+	fileSize = "file.size"
+	fileMD5 = "file.md5"
+)
+
+type Increment struct {
+	Starts time.Time
+	Ends   time.Time
+	Num    int `toml:"increment"`
 }
 
-var (
-	ErrSkip = errors.New("skip module")
-	ErrDone = errors.New("done")
-)
-
-const (
-	DefaultSource = "Science Run"
-	DefaultModel  = "Flight Model"
-)
+func (i Increment) Contains(t time.Time) bool {
+	return i.Starts.Before(t) && i.Ends.After(t)
+}
 
 type Parameter struct {
 	Name  string `xml:"name"`
 	Value string `xml:"value"`
 }
 
-func MakeParameter(k, v string) Parameter {
+func MakeParameter(k string, v interface{}) Parameter {
 	p := Parameter{
 		Name:  k,
-		Value: v,
+		Value: fmt.Sprintf("%v", v),
 	}
 	return p
 }
@@ -57,7 +59,7 @@ type Meta struct {
 	Payloads   []Payload `toml:"payload"`
 }
 
-func (m *Meta) MarshalXML(e *xml.Encoder, _ xml.StartElement) error {
+func (m Meta) MarshalXML(e *xml.Encoder, _ xml.StartElement) error {
 	e.EncodeElement(m.Name, startElement("experimentName"))
 	e.EncodeElement(strings.Join(m.Domains, ", "), startElement("researchField"))
 	cs := struct {
@@ -84,19 +86,32 @@ func (m *Meta) MarshalXML(e *xml.Encoder, _ xml.StartElement) error {
 	return nil
 }
 
+type Link struct {
+	File string
+	Role string
+}
+
 type Data struct {
-	Experiment string `toml:"-"`
-	Rootdir    string
+	Experiment string
 	Level      int
-	Source     string
-	Integrity  string
-	Type       string
-	Model      string
+	Source     string // Science Run, EST,...
+	Integrity  string `toml:"-"`
+	Sum        string `toml:"-"`
+	Type       string // Doc, Image,...
+	Model      string // FM, EM,...
 	Crews      []string
 	Owner      string
-	Increments []string
+	Increments []int
+	Mime       string
+	File       string
+	ModTime    time.Time
+	AcqTime    time.Time
 
-	Info FileInfo
+	Parameters []Parameter `toml:"metadata"`
+	Links      []Link      `toml:"links"`
+
+	Size int64
+	MD5  string
 }
 
 func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
@@ -104,10 +119,10 @@ func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
 	e.EncodeElement(d.Model, startElement("model"))
 	e.EncodeElement(d.Source, startElement("dataSource"))
 	e.EncodeElement(d.Owner, startElement("dataOwner"))
-	e.EncodeElement(d.Info.AcqTime.Format(time.RFC3339), startElement("acquisitionTime"))
-	e.EncodeElement(d.Info.ModTime.Format(time.RFC3339), startElement("creationTime"))
+	e.EncodeElement(d.AcqTime.Format(time.RFC3339), startElement("acquisitionTime"))
+	e.EncodeElement(d.ModTime.Format(time.RFC3339), startElement("creationTime"))
 	is := struct {
-		Values []string `xml:"increment"`
+		Values []int `xml:"increment"`
 	}{
 		Values: d.Increments,
 	}
@@ -118,37 +133,42 @@ func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
 		Values: d.Crews,
 	}
 	e.EncodeElement(cs, startElement("involvedCrew"))
-	e.EncodeElement(d.Info.Level, startElement("processingLevel"))
-	if d.Info.Type == "" {
-		d.Info.Type = d.Type
-	}
-	e.EncodeElement(d.Info.Type, startElement("productType"))
-	e.EncodeElement(d.Info.Mime, startElement("fileFormat"))
-	e.EncodeElement(d.Info.File, startElement("relativePath"))
+	e.EncodeElement(d.Level, startElement("processingLevel"))
+	e.EncodeElement(d.Type, startElement("productType"))
+	e.EncodeElement(d.Mime, startElement("fileFormat"))
+	e.EncodeElement(d.File, startElement("relativePath"))
 	xs := struct {
 		Method string `xml:"method"`
 		Value  string `xml:"value"`
 	}{
-		Method: d.Info.Integrity,
-		Value:  d.Info.Sum,
+		Method: d.Integrity,
+		Value:  d.Sum,
 	}
 	e.EncodeElement(xs, startElement("integrity"))
-	sort.Slice(d.Info.Parameters, func(i, j int) bool {
-		return d.Info.Parameters[i].Name < d.Info.Parameters[j].Name
+	for i, k := range d.Links {
+		var (
+			h = MakeParameter(fmt.Sprintf(ptrRef, i+1), k.File)
+			r = MakeParameter(fmt.Sprintf(ptrRole, i+1), k.Role)
+		)
+		d.Parameters = append(d.Parameters, h, r)
+	}
+	if d.Size > 0 {
+		d.Parameters = append(d.Parameters, MakeParameter(fileSize, d.Size))
+	}
+	if d.MD5 != "" {
+		d.Parameters = append(d.Parameters, MakeParameter(fileMD5, d.MD5))
+	}
+	sort.Slice(d.Parameters, func(i, j int) bool {
+		return d.Parameters[i].Name < d.Parameters[j].Name
 	})
 	ps := struct {
 		Values []Parameter `xml:"parameter"`
 	}{
-		Values: d.Info.Parameters,
+		Values: d.Parameters,
 	}
 	e.EncodeElement(ps, startElement("experimentSpecificMetadata"))
 
 	return nil
-}
-
-func startElement(label string) xml.StartElement {
-	n := xml.Name{Local: label}
-	return xml.StartElement{Name: n}
 }
 
 func EncodeMeta(w io.Writer, m Meta) error {
@@ -186,4 +206,9 @@ func encodeDocument(w io.Writer, doc interface{}) error {
 	e := xml.NewEncoder(w)
 	e.Indent("", "\t")
 	return e.Encode(doc)
+}
+
+func startElement(label string) xml.StartElement {
+	n := xml.Name{Local: label}
+	return xml.StartElement{Name: n}
 }

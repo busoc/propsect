@@ -55,7 +55,7 @@ const (
 )
 
 type FileInfo struct {
-	Ext string
+	Ext  string
 	Mime string
 	Type string
 }
@@ -64,7 +64,7 @@ type Settings struct {
 	Datadir string `toml:"data"`
 	Archive string
 	Exif    []string
-	Infos []FileInfo `toml:"types"`
+	Infos   []FileInfo `toml:"types"`
 
 	prospect.Meta `toml:"meta"`
 	prospect.Data `toml:"dataset"`
@@ -111,8 +111,8 @@ func main() {
 			return err
 		}
 		var (
-			now     = time.Now()
-			ext     = filepath.Ext(file)
+			now = time.Now()
+			ext = filepath.Ext(file)
 		)
 		switch ext {
 		case ExtMOV:
