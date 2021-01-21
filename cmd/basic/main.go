@@ -32,9 +32,8 @@ func (d *Data) Update() error {
 	var (
 		sumSHA = sha256.New()
 		sumMD5 = md5.New()
-		ws     = io.MultiWriter(sumSHA, sumMD5)
 	)
-	if d.Size, err = io.Copy(ws, r); err != nil {
+	if d.Size, err = io.Copy(io.MultiWriter(sumSHA, sumMD5), r); err != nil {
 		return err
 	}
 
@@ -147,6 +146,6 @@ func main() {
 			log.Printf("storing %s: %s", d.File, err)
       continue
 		}
-    log.Printf("done %s (%d - %s - %x)", d.File, d.Size, time.Since(now), d.MD5)
+    log.Printf("done %s (%d - %s - %s)", d.File, d.Size, time.Since(now), d.MD5)
 	}
 }
