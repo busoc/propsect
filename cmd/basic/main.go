@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+  "time"
 
 	"github.com/busoc/prospect"
 	"github.com/midbel/toml"
@@ -136,6 +137,7 @@ func main() {
 	}
 	for _, d := range c.Data {
     log.Printf("start processing %s", d.File)
+    now := time.Now()
 		d = c.Default.Update(d)
 		if err := d.Update(); err != nil {
 			log.Printf("update %s: %s", d.File, err)
@@ -145,6 +147,6 @@ func main() {
 			log.Printf("storing %s: %s", d.File, err)
       continue
 		}
-    log.Printf("done %s", d.File)
+    log.Printf("done %s (%d - %s - %x)", d.File, d.Size, time.Since(now), d.Sum)
 	}
 }
