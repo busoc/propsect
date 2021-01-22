@@ -1,15 +1,32 @@
 package prospect
 
 import (
+	"bytes"
+	"crypto/md5"
+	"crypto/sha256"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+)
+
+const (
+	MimePlain   = "text/plain"
+	MimeOctet   = "application/octet-stream"
+	MimeQuick   = "video/quicktime"
+	MimeJpeg    = "image/jpeg"
+	TypeCommand = "command output"
+	TypeImage   = "image"
+	TypeVideo   = "video"
+	TypeText    = "text"
+	TypeData    = "data"
 )
 
 const (
@@ -99,6 +116,46 @@ type Archive struct {
 	MetaDir string `toml:"metadir"`
 }
 
+func (a Archive) CreateFromCommand(d Data, pattern string, args []string) (Link, error) {
+	var k Link
+	if len(args) == 0 {
+		return k, nil
+	}
+	args = append(args, d.File)
+	var (
+		buf    bytes.Buffer
+		cmd    = exec.Command(args[0], args[1:]...)
+		sumSHA = sha256.New()
+		sumMD5 = md5.New()
+	)
+	cmd.Stdout = io.MultiWriter(&buf, sumSHA, sumMD5)
+	if err := cmd.Run(); err != nil {
+		return k, err
+	}
+	r, err := ParseResolver(pattern)
+	if err != nil {
+		return k, err
+	}
+	file := filepath.Join(r.Resolve(d), filepath.Base(d.File))
+
+	d.Parameters = d.Parameters[:0]
+	d.Links = append(d.Links, Link{File: file, Role: TypeData})
+	d.Level++
+	d.Type = TypeCommand
+	d.Mime = MimePlain
+	d.Sum = fmt.Sprintf("%x", sumSHA.Sum(nil))
+	d.MD5 = fmt.Sprintf("%x", sumMD5.Sum(nil))
+	d.Size = int64(buf.Len())
+
+	d.File = file + "." + filepath.Base(args[0])
+	if err := a.storeFile(d, buf.Bytes()); err != nil {
+		return k, err
+	}
+	k.File = d.File
+	k.Role = TypeCommand
+	return k, a.storeMeta(d, d.File)
+}
+
 func (a Archive) Store(d Data, pattern string) error {
 	r, err := ParseResolver(pattern)
 	if err != nil {
@@ -123,6 +180,14 @@ func (a Archive) storeMeta(d Data, file string) error {
 	}
 	defer w.Close()
 	return EncodeData(w, d)
+}
+
+func (a Archive) storeFile(d Data, buf []byte) error {
+	file := filepath.Join(a.DataDir, d.File)
+	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+		return err
+	}
+	return ioutil.WriteFile(file, buf, 0644)
 }
 
 func (a Archive) storeLink(d Data, file string) error {
@@ -173,6 +238,7 @@ func (c Context) Update(d Data) Data {
 }
 
 type Data struct {
+	Extensions []string
 	Experiment string
 	Level      int
 	Source     string // Science Run, EST,...
@@ -193,6 +259,17 @@ type Data struct {
 
 	Size int64
 	MD5  string
+}
+
+func (d Data) Accept(file string) bool {
+	if len(d.Extensions) == 0 {
+		return false
+	}
+	var (
+		e = filepath.Ext(file)
+		i = sort.SearchStrings(d.Extensions, e)
+	)
+	return i < len(d.Extensions) && d.Extensions[i] == e
 }
 
 func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {

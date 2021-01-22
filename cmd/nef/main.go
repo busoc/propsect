@@ -45,16 +45,16 @@ const (
 
 	SHA = "SHA256"
 
-	MimeNEF  = "image/x-nikon-nef"
-	MimeMOV  = "video/quicktime"
-	MimeDUMP = "text/csv;comma=tab"
+	MimeNEF   = "image/x-nikon-nef"
+	MimeMOV   = "video/quicktime"
+	MimeDUMP  = "text/csv;comma=tab"
 	MimePlain = "text/plain"
-	MimeJPG = "image/jpeg"
-	TypeNEF  = "raw image"
-	TypeExif = "exif tags listing"
-	TypeMOV  = "video"
-	TypeDUMP = "parameters dump"
-	TypeData = "data"
+	MimeJPG   = "image/jpeg"
+	TypeNEF   = "raw image"
+	TypeExif  = "exif tags listing"
+	TypeMOV   = "video"
+	TypeDUMP  = "parameters dump"
+	TypeData  = "data"
 	TypeImage = "image"
 )
 

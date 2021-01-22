@@ -54,15 +54,18 @@ func main() {
 		os.Exit(1)
 	}
 	for _, d := range c.Data {
+		if i, err := os.Stat(d.File); err != nil || !i.Mode().IsRegular() {
+			continue
+		}
 		log.Printf("start processing %s", d.File)
 		now := time.Now()
 		d.Data = c.Update(d.Data)
 		if err := d.Update(); err != nil {
-			log.Printf("update %s: %s", d.File, err)
+			log.Printf("fail to update %s: %s", d.File, err)
 			continue
 		}
 		if err := c.Store(d.Data, d.Archive); err != nil {
-			log.Printf("storing %s: %s", d.File, err)
+			log.Printf("fail to store %s: %s", d.File, err)
 			continue
 		}
 		log.Printf("done %s (%d - %s - %s)", d.File, d.Size, time.Since(now), d.MD5)
