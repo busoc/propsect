@@ -39,15 +39,39 @@ type Cmd struct {
 	Path string
 	File string
 	Args []string
+
+	Pre  []Command
+	Post []Command
 }
 
 func (c Cmd) Exec() error {
+	if err := execCmd(c.Pre...); err != nil {
+		return err
+	}
+	if err := execCmd(c); err != nil {
+		return err
+	}
+	return execCmd(c.Post...)
+}
+
+func (c Cmd) Run() error {
 	args := append(c.Args, c.File)
 	cmd := exec.Command(c.Path, args...)
 	cmd.Stdout = Out
 	cmd.Stderr = Err
 
 	return cmd.Run()
+}
+
+func execCmd(cs ...Cmd) error {
+	var err error
+	for _, c := range cs {
+		err = c.Run()
+		if err != nil {
+			break
+		}
+	}
+	return err
 }
 
 func main() {
