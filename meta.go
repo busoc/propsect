@@ -111,6 +111,18 @@ type Link struct {
 	Role string
 }
 
+func CreateLinkFrom(d Data, pattern string) Link {
+	file := Resolve(d, pattern)
+	return CreateLink(file, d.Type)
+}
+
+func CreateLink(n, r string) Link {
+	return Link{
+		File: n,
+		Role: r,
+	}
+}
+
 type Archive struct {
 	DataDir string `toml:"datadir"`
 	MetaDir string `toml:"metadir"`

@@ -1,50 +1,44 @@
 package main
 
 import (
+	"bytes"
 	"crypto/md5"
 	"crypto/sha256"
 	"flag"
 	"fmt"
+	"image/jpeg"
 	"io"
 	"os"
 	"path/filepath"
+  "strings"
 
 	"github.com/busoc/prospect"
 	"github.com/midbel/exif/nef"
 	"github.com/midbel/toml"
 )
 
-const Mime = "image/x-nikon-nef"
+const (
+  SHA       = "SHA256"
+	Mime      = "image/x-nikon-nef"
+
+	ImgWidth  = "image.width"
+	ImgHeight = "image.height"
+
+  ExtDAT = ".dat"
+  ExtJPG = ".jpg"
+)
 
 type Data struct {
 	prospect.Data
 	Archive string
 }
 
-func (d Data) Process(file string) (Data, []Data, error) {
+func (d Data) Process(file string) (Data, error) {
 	x, err := d.processNEF(file)
 	if err != nil {
-		return x, nil, err
+		return x, err
 	}
-
-	files, err := nef.DecodeFile(file)
-	if err != nil {
-		return x, nil, err
-	}
-
-	var xs []Data
-	for _, f := range files {
-		ds, err := d.processImage(f)
-		if err != nil {
-			return x, xs, err
-		}
-		xs = append(xs, ds...)
-	}
-	return x, xs, nil
-}
-
-func (d Data) processImage(f *nef.File) ([]Data, error) {
-	return nil, nil
+	return x, nil
 }
 
 func (d Data) processNEF(file string) (Data, error) {
@@ -63,7 +57,7 @@ func (d Data) processNEF(file string) (Data, error) {
 		return d, err
 	}
 
-	d.Integrity = "SHA256"
+	d.Integrity = SHA
 	d.Sum = fmt.Sprintf("%x", sumSHA.Sum(nil))
 	d.MD5 = fmt.Sprintf("%x", sumMD5.Sum(nil))
 
@@ -95,25 +89,113 @@ func main() {
 	}
 	run(c.Data, func(d Data) {
 		d.Data = c.Update(d.Data)
+    d.Integrity = SHA
 		filepath.Walk(d.File, func(file string, i os.FileInfo, err error) error {
 			if err != nil || i.IsDir() || !d.Accept(file) {
 				return err
 			}
-			d, _, err := d.Process(file)
+			x, err := d.Process(file)
 			if err != nil {
 				return nil
 			}
-			k, err := c.CreateFromCommand(d.Data, d.Archive, c.Exif)
+			k, err := c.CreateFromCommand(x.Data, x.Archive, c.Exif)
 			if err != nil {
 				return err
 			}
-			d.Links = append(d.Links, k)
-			if err := c.Store(d.Data, d.Archive); err != nil {
+			x.Links = append(x.Links, k)
+			if err := c.Store(x.Data, x.Archive); err != nil {
 				return nil
 			}
-			return nil
+
+      d.AcqTime = x.AcqTime
+      d.ModTime = x.ModTime
+      d.Links = append(d.Links, prospect.CreateLinkFrom(x.Data, d.Archive))
+			extractImage(file, func(base string, f *nef.File) error {
+        d.Parameters, d.File = d.Parameters[:0], base
+        buf, err := updateDataFromImage(f, &d)
+        if err != nil {
+          return err
+        }
+        k, err = c.CreateFile(d.Data, d.Archive, buf)
+        if err == nil {
+          k.Role = d.Type
+          x.Links = append(x.Links, k)
+        }
+        return err
+			})
+      return c.Store(x.Data, x.Archive)
 		})
 	})
+}
+
+func updateDataFromImage(f *nef.File, d *Data) ([]byte, error) {
+  d.Type = prospect.TypeImage
+	d.Mime = prospect.MimeJpeg
+	d.Level = 1
+
+  var (
+    buf []byte
+    err error
+    ext string
+  )
+  if !f.IsSupported() {
+    d.Mime = prospect.MimeOctet
+		d.Type = prospect.TypeData
+		d.Level--
+
+		buf, err = rawBytes(f)
+		ext = ExtDAT
+  } else {
+    buf, err = imageBytes(f)
+    ext = ExtJPG
+
+    cfg, _ := jpeg.DecodeConfig(bytes.NewReader(buf))
+		d.Parameters = []prospect.Parameter{
+			prospect.MakeParameter(ImgWidth, cfg.Width),
+			prospect.MakeParameter(ImgHeight, cfg.Height),
+		}
+  }
+  if err != nil {
+    return nil, err
+  }
+  d.Size = int64(len(buf))
+  d.MD5 = fmt.Sprintf("%x", md5.Sum(buf))
+  d.Sum = fmt.Sprintf("%x", sha256.Sum256(buf))
+  d.File = d.File + "_" + f.Filename() + ext
+  return buf, nil
+}
+
+func imageBytes(f *nef.File) ([]byte, error) {
+	img, err := f.Image()
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	err = jpeg.Encode(&buf, img, nil)
+	return buf.Bytes(), err
+}
+
+func rawBytes(f *nef.File) ([]byte, error) {
+	return f.Bytes()
+}
+
+func extractImage(file string, fn func(string, *nef.File) error) error {
+  var (
+    base = strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
+    walk func([]*nef.File)
+  )
+	walk = func(files []*nef.File) {
+		for _, f := range files {
+			fn(base, f)
+			walk(f.Files)
+		}
+	}
+	files, err := nef.DecodeFile(file)
+	if err != nil {
+		return err
+	}
+	walk(files)
+	return nil
 }
 
 func run(data []Data, fn func(Data)) {

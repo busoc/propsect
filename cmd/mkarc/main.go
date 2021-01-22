@@ -4,16 +4,19 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/midbel/toml"
 	"golang.org/x/sync/semaphore"
 )
 
 type writer struct {
-	inner *os.File
+	inner io.Writer
 	mu    sync.Mutex
 }
 
@@ -24,7 +27,7 @@ func (w *writer) Write(b []byte) (int, error) {
 }
 
 func Writer(w io.Writer) io.Writer {
-	return writer{inner: w}
+	return &writer{inner: w}
 }
 
 var (
@@ -51,8 +54,8 @@ func main() {
 	flag.Parse()
 
 	c := struct {
-		Task     int64
-		Commands []Cmd
+		Task     int64 `toml:"parallel"`
+		Commands []Cmd `toml:"command"`
 	}{}
 	if err := toml.DecodeFile(flag.Arg(0), &c); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -70,9 +73,15 @@ func main() {
 			os.Exit(2)
 		}
 		go func(c Cmd) {
-			defer sema.Release()
-			c.Exec()
+			defer func(n time.Time) {
+				sema.Release(1)
+				log.Printf("done: %s %s (%s)", c.Path, c.File, time.Since(n))
+			}(time.Now())
+			log.Printf("start: %s %s", c.Path, c.File)
+			if err := c.Exec(); err != nil {
+				log.Printf("error: %s", err)
+			}
 		}(c)
 	}
-	sema.Acquire(ctx, len(c.Commands))
+	sema.Acquire(ctx, c.Task)
 }
