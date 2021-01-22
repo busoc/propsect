@@ -156,6 +156,21 @@ func (a Archive) CreateFromCommand(d Data, pattern string, args []string) (Link,
 	return k, a.storeMeta(d, d.File)
 }
 
+func (a Archive) CreateFile(d Data, pattern string, buf []byte) (Link, error) {
+	var k Link
+	r, err := ParseResolver(pattern)
+	if err != nil {
+		return k, err
+	}
+	d.File = filepath.Join(r.Resolve(d), filepath.Join(d.File))
+	if err := a.storeFile(d, buf); err != nil {
+		return k, err
+	}
+	k.File = d.File
+	k.Role = ""
+	return k, a.storeMeta(d, d.File)
+}
+
 func (a Archive) Store(d Data, pattern string) error {
 	r, err := ParseResolver(pattern)
 	if err != nil {
@@ -261,10 +276,18 @@ type Data struct {
 	MD5  string
 }
 
+func (d Data) ToLink() Link {
+	return Link{
+		File: d.File,
+		Role: d.Type,
+	}
+}
+
 func (d Data) Accept(file string) bool {
 	if len(d.Extensions) == 0 {
 		return false
 	}
+	sort.Strings(d.Extensions)
 	var (
 		e = filepath.Ext(file)
 		i = sort.SearchStrings(d.Extensions, e)
@@ -304,11 +327,12 @@ func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
 	}
 	e.EncodeElement(xs, startElement("integrity"))
 	for i, k := range d.Links {
-		var (
-			h = MakeParameter(fmt.Sprintf(ptrRef, i+1), k.File)
-			r = MakeParameter(fmt.Sprintf(ptrRole, i+1), k.Role)
-		)
-		d.Parameters = append(d.Parameters, h, r)
+		h := MakeParameter(fmt.Sprintf(ptrRef, i+1), k.File)
+		d.Parameters = append(d.Parameters, h)
+		if k.Role != "" {
+			r := MakeParameter(fmt.Sprintf(ptrRole, i+1), k.Role)
+			d.Parameters = append(d.Parameters, r)
+		}
 	}
 	if d.Size > 0 {
 		d.Parameters = append(d.Parameters, MakeParameter(fileSize, d.Size))
