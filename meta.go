@@ -36,6 +36,33 @@ const (
 	fileMD5  = "file.md5"
 )
 
+type MimeSet []Mime
+
+func (ms MimeSet) Get(ext string) Mime {
+	for _, m := range ms {
+		if !m.isZero() && m.Accept(ext) {
+			return m
+		}
+	}
+	return Mime{}
+}
+
+type Mime struct {
+	Extensions []string
+	Mime       string
+	Type       string
+}
+
+func (m Mime) Accept(ext string) bool {
+	sort.Strings(m.Extensions)
+	i := sort.SearchStrings(m.Extensions, ext)
+	return i < len(m.Extensions) && m.Extensions[i] == ext
+}
+
+func (m Mime) isZero() bool {
+	return m.Mime == "" && m.Type == "" && len(m.Extensions) == 0
+}
+
 type Increment struct {
 	Starts time.Time
 	Ends   time.Time
@@ -234,6 +261,8 @@ type Data struct {
 	AcqTime    time.Time
 	Archive    Pattern
 
+	Mimes MimeSet `toml:"mimetype"`
+
 	Parameters []Parameter `toml:"metadata"`
 	Links      []Link      `toml:"links"`
 
@@ -249,6 +278,15 @@ func ReadFile(d *Data, file string) error {
 	}
 	defer r.Close()
 
+	m := d.Mimes.Get(filepath.Ext(file))
+	if !m.isZero() {
+		if d.Type == "" {
+			d.Type = m.Type
+		}
+		if d.Mime == "" {
+			d.Mime = m.Mime
+		}
+	}
 	return ReadFrom(d, r)
 }
 
@@ -256,7 +294,7 @@ func ReadFrom(d *Data, r io.Reader) error {
 	var (
 		sumSHA = sha256.New()
 		sumMD5 = md5.New()
-		err error
+		err    error
 	)
 	if d.Size, err = io.Copy(io.MultiWriter(sumSHA, sumMD5), r); err != nil {
 		return err
@@ -333,9 +371,6 @@ func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
 	if d.MD5 != "" {
 		d.Parameters = append(d.Parameters, MakeParameter(fileMD5, d.MD5))
 	}
-	sort.Slice(d.Parameters, func(i, j int) bool {
-		return d.Parameters[i].Name < d.Parameters[j].Name
-	})
 	ps := struct {
 		Values []Parameter `xml:"parameter"`
 	}{

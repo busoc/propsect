@@ -1,28 +1,55 @@
 package prospect
 
 import (
+	"path/filepath"
+
 	"github.com/midbel/toml"
 )
 
 type Builder struct {
 	Archive
 	Context
+	Mimes    MimeSet   `toml:"mimetype"`
 	Commands []Command `toml:"command"`
 	Data     []Data    `toml:"file"`
 }
 
-func Build(file, mime string, run func(b Builder, d Data)) error {
+type RunFunc func(Builder, Data)
+
+type AcceptFunc func(Data) bool
+
+func Build(file string, run RunFunc, accept AcceptFunc) error {
 	var b Builder
 	if err := toml.DecodeFile(file, &b); err != nil {
 		return err
 	}
+	if accept == nil {
+		accept = func(_ Data) bool { return true }
+	}
 	for _, d := range b.Data {
-		if d.Mime != mime {
+		if d.Type == "" && d.Mime == "" && len(b.Mimes) == 0 {
+			continue
+		}
+		if !accept(d) {
 			continue
 		}
 		run(b, b.Update(d))
 	}
 	return nil
+}
+
+func (b Builder) GetMime(d Data) Data {
+	m := b.Mimes.Get(filepath.Ext(d.File))
+	if m.isZero() {
+		return d
+	}
+	if d.Mime == "" {
+		d.Mime = m.Mime
+	}
+	if d.Type == "" {
+		d.Type = m.Type
+	}
+	return d
 }
 
 func (b Builder) ExecuteCommands(d Data) ([]Link, error) {

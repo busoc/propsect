@@ -17,7 +17,10 @@ const Mime = "video/quicktime"
 func main() {
 	flag.Parse()
 
-	err := prospect.Build(flag.Arg(0), Mime, collectData)
+	accept := func(d prospect.Data) bool {
+		return d.Mime == Mime
+	}
+	err := prospect.Build(flag.Arg(0), collectData, accept)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

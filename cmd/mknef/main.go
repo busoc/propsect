@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	SHA  = "SHA256"
 	Mime = "image/x-nikon-nef"
 
 	ImgWidth  = "image.width"
@@ -27,7 +26,10 @@ const (
 func main() {
 	flag.Parse()
 
-	err := prospect.Build(flag.Arg(0), Mime, collectData)
+	accept := func(d prospect.Data) bool {
+		return d.Mime == Mime
+	}
+	err := prospect.Build(flag.Arg(0), collectData, accept)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -55,7 +57,7 @@ func collectData(b prospect.Builder, d prospect.Data) {
 		d.AcqTime = x.AcqTime
 		d.ModTime = x.ModTime
 		d.Links = append(d.Links, prospect.CreateLinkFrom(x))
-		extractImage(file, func(base string, f *nef.File) error {
+		extractImages(file, func(base string, f *nef.File) error {
 			d.Parameters, d.File = d.Parameters[:0], base
 			buf, err := updateDataFromImage(f, &d)
 			if err != nil {
@@ -140,7 +142,7 @@ func rawBytes(f *nef.File) ([]byte, error) {
 	return f.Bytes()
 }
 
-func extractImage(file string, fn func(string, *nef.File) error) error {
+func extractImages(file string, fn func(string, *nef.File) error) error {
 	var (
 		base = strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 		walk func([]*nef.File)
