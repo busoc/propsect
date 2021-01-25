@@ -14,12 +14,19 @@ import (
 	"github.com/midbel/toml"
 )
 
+type Mime struct {
+	Extensions []string
+	Mime       string
+	Type       string
+}
+
 type Data struct {
 	prospect.Data
+	Mimes   []Mime
 	Archive string
 }
 
-func (d *Data) Update() error {
+func (d *Data) Process() error {
 	r, err := os.Open(d.File)
 	if err != nil {
 		return err
@@ -60,7 +67,7 @@ func main() {
 		log.Printf("start processing %s", d.File)
 		now := time.Now()
 		d.Data = c.Update(d.Data)
-		if err := d.Update(); err != nil {
+		if err := d.Process(); err != nil {
 			log.Printf("fail to update %s: %s", d.File, err)
 			continue
 		}

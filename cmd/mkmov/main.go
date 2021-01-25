@@ -40,7 +40,7 @@ func (d Data) Process(file string) (Data, error) {
 		return d, err
 	}
 
-	d.Integrity = "SHA256"
+	d.Integrity = prospect.SHA
 	d.Sum = fmt.Sprintf("%x", sumSHA.Sum(nil))
 	d.MD5 = fmt.Sprintf("%x", sumMD5.Sum(nil))
 

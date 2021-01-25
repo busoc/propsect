@@ -10,7 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-  "strings"
+	"strings"
 
 	"github.com/busoc/prospect"
 	"github.com/midbel/exif/nef"
@@ -18,14 +18,14 @@ import (
 )
 
 const (
-  SHA       = "SHA256"
-	Mime      = "image/x-nikon-nef"
+	SHA  = "SHA256"
+	Mime = "image/x-nikon-nef"
 
 	ImgWidth  = "image.width"
 	ImgHeight = "image.height"
 
-  ExtDAT = ".dat"
-  ExtJPG = ".jpg"
+	ExtDAT = ".dat"
+	ExtJPG = ".jpg"
 )
 
 type Data struct {
@@ -89,7 +89,7 @@ func main() {
 	}
 	run(c.Data, func(d Data) {
 		d.Data = c.Update(d.Data)
-    d.Integrity = SHA
+		d.Integrity = SHA
 		filepath.Walk(d.File, func(file string, i os.FileInfo, err error) error {
 			if err != nil || i.IsDir() || !d.Accept(file) {
 				return err
@@ -107,62 +107,62 @@ func main() {
 				return nil
 			}
 
-      d.AcqTime = x.AcqTime
-      d.ModTime = x.ModTime
-      d.Links = append(d.Links, prospect.CreateLinkFrom(x.Data, d.Archive))
+			d.AcqTime = x.AcqTime
+			d.ModTime = x.ModTime
+			d.Links = append(d.Links, prospect.CreateLinkFrom(x.Data, d.Archive))
 			extractImage(file, func(base string, f *nef.File) error {
-        d.Parameters, d.File = d.Parameters[:0], base
-        buf, err := updateDataFromImage(f, &d)
-        if err != nil {
-          return err
-        }
-        k, err = c.CreateFile(d.Data, d.Archive, buf)
-        if err == nil {
-          k.Role = d.Type
-          x.Links = append(x.Links, k)
-        }
-        return err
+				d.Parameters, d.File = d.Parameters[:0], base
+				buf, err := updateDataFromImage(f, &d)
+				if err != nil {
+					return err
+				}
+				k, err = c.CreateFile(d.Data, d.Archive, buf)
+				if err == nil {
+					k.Role = d.Type
+					x.Links = append(x.Links, k)
+				}
+				return err
 			})
-      return c.Store(x.Data, x.Archive)
+			return c.Store(x.Data, x.Archive)
 		})
 	})
 }
 
 func updateDataFromImage(f *nef.File, d *Data) ([]byte, error) {
-  d.Type = prospect.TypeImage
+	d.Type = prospect.TypeImage
 	d.Mime = prospect.MimeJpeg
 	d.Level = 1
 
-  var (
-    buf []byte
-    err error
-    ext string
-  )
-  if !f.IsSupported() {
-    d.Mime = prospect.MimeOctet
+	var (
+		buf []byte
+		err error
+		ext string
+	)
+	if !f.IsSupported() {
+		d.Mime = prospect.MimeOctet
 		d.Type = prospect.TypeData
 		d.Level--
 
 		buf, err = rawBytes(f)
 		ext = ExtDAT
-  } else {
-    buf, err = imageBytes(f)
-    ext = ExtJPG
+	} else {
+		buf, err = imageBytes(f)
+		ext = ExtJPG
 
-    cfg, _ := jpeg.DecodeConfig(bytes.NewReader(buf))
+		cfg, _ := jpeg.DecodeConfig(bytes.NewReader(buf))
 		d.Parameters = []prospect.Parameter{
 			prospect.MakeParameter(ImgWidth, cfg.Width),
 			prospect.MakeParameter(ImgHeight, cfg.Height),
 		}
-  }
-  if err != nil {
-    return nil, err
-  }
-  d.Size = int64(len(buf))
-  d.MD5 = fmt.Sprintf("%x", md5.Sum(buf))
-  d.Sum = fmt.Sprintf("%x", sha256.Sum256(buf))
-  d.File = d.File + "_" + f.Filename() + ext
-  return buf, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	d.Size = int64(len(buf))
+	d.MD5 = fmt.Sprintf("%x", md5.Sum(buf))
+	d.Sum = fmt.Sprintf("%x", sha256.Sum256(buf))
+	d.File = d.File + "_" + f.Filename() + ext
+	return buf, nil
 }
 
 func imageBytes(f *nef.File) ([]byte, error) {
@@ -180,10 +180,10 @@ func rawBytes(f *nef.File) ([]byte, error) {
 }
 
 func extractImage(file string, fn func(string, *nef.File) error) error {
-  var (
-    base = strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
-    walk func([]*nef.File)
-  )
+	var (
+		base = strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
+		walk func([]*nef.File)
+	)
 	walk = func(files []*nef.File) {
 		for _, f := range files {
 			fn(base, f)

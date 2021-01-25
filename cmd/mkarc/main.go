@@ -40,8 +40,8 @@ type Cmd struct {
 	File string
 	Args []string
 
-	Pre  []Command
-	Post []Command
+	Pre  []Cmd `toml:"pre"`
+	Post []Cmd `toml:"post"`
 }
 
 func (c Cmd) Exec() error {

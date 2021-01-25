@@ -18,6 +18,8 @@ import (
 )
 
 const (
+	SHA = "SHA256"
+
 	MimePlain   = "text/plain"
 	MimeOctet   = "application/octet-stream"
 	MimeQuick   = "video/quicktime"
