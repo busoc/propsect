@@ -236,7 +236,7 @@ func (c Context) Update(d Data) Data {
 	if d.Owner == "" {
 		d.Owner = c.Owner
 	}
-	if !d.AcqTime.IsZero() && len(c.Increments) > 0 {
+	if !d.AcqTime.IsZero() && len(d.Increments) == 0 && len(c.Increments) > 0 {
 		sort.Slice(c.Increments, func(i, j int) bool {
 			return c.Increments[i].Starts.Before(c.Increments[j].Starts)
 		})
