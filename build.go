@@ -1,10 +1,31 @@
 package prospect
 
 import (
+	"compress/gzip"
+	"io"
+	"os"
 	"path/filepath"
 
 	"github.com/midbel/toml"
 )
+
+const ExtGZ = ".gz"
+
+func OpenFile(file string) (io.ReadCloser, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+
+	var r io.Reader = f
+	if filepath.Ext(file) == ExtGZ {
+		r, err = gzip.NewReader(r)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return NopCloser(r), nil
+}
 
 type Builder struct {
 	Archive
@@ -66,4 +87,19 @@ func (b Builder) ExecuteCommands(d Data) ([]Link, error) {
 		ks = append(ks, k)
 	}
 	return ks, nil
+}
+
+type readcloser struct {
+	io.Reader
+}
+
+func NopCloser(r io.Reader) io.ReadCloser {
+	return &readcloser{Reader: r}
+}
+
+func (r *readcloser) Close() error {
+	if c, ok := r.Reader.(io.Closer); ok {
+		return c.Close()
+	}
+	return nil
 }

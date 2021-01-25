@@ -1,11 +1,9 @@
 package main
 
 import (
-	"compress/gzip"
 	"encoding/csv"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -68,19 +66,10 @@ func processData(d prospect.Data, file string) (prospect.Data, error) {
 }
 
 func readFile(d prospect.Data) (prospect.Data, error) {
-	f, err := os.Open(d.File)
-	if err != nil {
-		return d, err
-	}
-	defer f.Close()
-
-	var r io.Reader = f
-	if filepath.Ext(d.File) == prospect.ExtGZ {
-		r, err = gzip.NewReader(r)
-		if err != nil {
-			return d, err
-		}
-	}
+  r, err := prospect.OpenFile(d.File)
+  if err != nil {
+    return d, err
+  }
 
 	rs := csv.NewReader(r)
 	rs.Comma = getDelimiter(d.Mime)

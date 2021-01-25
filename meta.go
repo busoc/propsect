@@ -1,7 +1,6 @@
 package prospect
 
 import (
-	"compress/gzip"
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/xml"
@@ -18,8 +17,6 @@ import (
 
 const (
 	SHA = "SHA256"
-
-	ExtGZ = ".gz"
 
 	MimePlain = "text/plain"
 	MimeOctet = "application/octet-stream"
@@ -280,19 +277,11 @@ type Data struct {
 
 func ReadFile(d *Data, file string) error {
 	d.File = file
-	f, err := os.Open(d.File)
+	r, err := OpenFile(file)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-
-	var r io.Reader = f
-	if filepath.Ext(file) == ExtGZ {
-		r, err = gzip.NewReader(r)
-		if err != nil {
-			return err
-		}
-	}
+	defer r.Close()
 
 	m := d.Mimes.Get(filepath.Ext(file))
 	if !m.isZero() {
