@@ -237,6 +237,9 @@ func (c Context) Update(d Data) Data {
 		d.Owner = c.Owner
 	}
 	if !d.AcqTime.IsZero() && len(c.Increments) > 0 {
+		sort.Slice(c.Increments, func(i, j int) bool {
+			return c.Increments[i].Starts.Before(c.Increments[j].Starts)
+		})
 		x := sort.Search(len(c.Increments), func(i int) bool {
 			return c.Increments[i].Contains(d.AcqTime)
 		})
