@@ -2,19 +2,15 @@ package main
 
 import (
 	"bytes"
-	"crypto/md5"
-	"crypto/sha256"
 	"flag"
 	"fmt"
 	"image/jpeg"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/busoc/prospect"
 	"github.com/midbel/exif/nef"
-	"github.com/midbel/toml"
 )
 
 const (
@@ -28,38 +24,58 @@ const (
 	ExtJPG = ".jpg"
 )
 
-type Data struct {
-	prospect.Data
+func main() {
+	flag.Parse()
+
+	err := prospect.Build(flag.Arg(0), Mime, collectData)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
 
-func (d Data) Process(file string) (Data, error) {
-	x, err := d.processNEF(file)
-	if err != nil {
-		return x, err
-	}
-	return x, nil
+func collectData(b prospect.Builder, d prospect.Data) {
+	filepath.Walk(d.File, func(file string, i os.FileInfo, err error) error {
+		if err != nil || i.IsDir() || !d.Accept(file) {
+			return err
+		}
+		x, err := processData(d, file)
+		if err != nil {
+			return nil
+		}
+		ks, err := b.ExecuteCommands(x)
+		if err != nil {
+			return nil
+		}
+		x.Links = append(x.Links, ks...)
+		if err := b.Store(x); err != nil {
+			return nil
+		}
+
+		d.AcqTime = x.AcqTime
+		d.ModTime = x.ModTime
+		d.Links = append(d.Links, prospect.CreateLinkFrom(x))
+		extractImage(file, func(base string, f *nef.File) error {
+			d.Parameters, d.File = d.Parameters[:0], base
+			buf, err := updateDataFromImage(f, &d)
+			if err != nil {
+				return err
+			}
+			k, err := b.CreateFile(d, buf)
+			if err == nil {
+				k.Role = d.Type
+				x.Links = append(x.Links, k)
+			}
+			return err
+		})
+		return b.Store(x)
+	})
 }
 
-func (d Data) processNEF(file string) (Data, error) {
-	d.File = file
-	r, err := os.Open(d.File)
-	if err != nil {
+func processData(d prospect.Data, file string) (prospect.Data, error) {
+	if err := prospect.ReadFile(&d, file); err != nil {
 		return d, err
 	}
-	defer r.Close()
-
-	var (
-		sumSHA = sha256.New()
-		sumMD5 = md5.New()
-	)
-	if d.Size, err = io.Copy(io.MultiWriter(sumSHA, sumMD5), r); err != nil {
-		return d, err
-	}
-
-	d.Integrity = SHA
-	d.Sum = fmt.Sprintf("%x", sumSHA.Sum(nil))
-	d.MD5 = fmt.Sprintf("%x", sumMD5.Sum(nil))
-
 	files, err := nef.DecodeFile(file)
 	if err != nil {
 		return d, err
@@ -73,61 +89,7 @@ func (d Data) processNEF(file string) (Data, error) {
 	return d, nil
 }
 
-func main() {
-	flag.Parse()
-
-	c := struct {
-		prospect.Archive
-		prospect.Context
-		Exif []string
-		Data []Data `toml:"file"`
-	}{}
-	if err := toml.DecodeFile(flag.Arg(0), &c); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	run(c.Data, func(d Data) {
-		d.Data = c.Update(d.Data)
-		d.Integrity = SHA
-		filepath.Walk(d.File, func(file string, i os.FileInfo, err error) error {
-			if err != nil || i.IsDir() || !d.Accept(file) {
-				return err
-			}
-			x, err := d.Process(file)
-			if err != nil {
-				return nil
-			}
-			k, err := c.CreateFromCommand(x.Data, c.Exif)
-			if err != nil {
-				return err
-			}
-			x.Links = append(x.Links, k)
-			if err := c.Store(x.Data); err != nil {
-				return nil
-			}
-
-			d.AcqTime = x.AcqTime
-			d.ModTime = x.ModTime
-			d.Links = append(d.Links, prospect.CreateLinkFrom(x.Data))
-			extractImage(file, func(base string, f *nef.File) error {
-				d.Parameters, d.File = d.Parameters[:0], base
-				buf, err := updateDataFromImage(f, &d)
-				if err != nil {
-					return err
-				}
-				k, err = c.CreateFile(d.Data, buf)
-				if err == nil {
-					k.Role = d.Type
-					x.Links = append(x.Links, k)
-				}
-				return err
-			})
-			return c.Store(x.Data)
-		})
-	})
-}
-
-func updateDataFromImage(f *nef.File, d *Data) ([]byte, error) {
+func updateDataFromImage(f *nef.File, d *prospect.Data) ([]byte, error) {
 	d.Type = prospect.TypeImage
 	d.Mime = prospect.MimeJpeg
 	d.Level = 1
@@ -157,9 +119,9 @@ func updateDataFromImage(f *nef.File, d *Data) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	d.Size = int64(len(buf))
-	d.MD5 = fmt.Sprintf("%x", md5.Sum(buf))
-	d.Sum = fmt.Sprintf("%x", sha256.Sum256(buf))
+	if err := prospect.ReadFrom(d, bytes.NewReader(buf)); err != nil {
+		return nil, err
+	}
 	d.File = d.File + "_" + f.Filename() + ext
 	return buf, nil
 }
@@ -195,12 +157,4 @@ func extractImage(file string, fn func(string, *nef.File) error) error {
 	}
 	walk(files)
 	return nil
-}
-
-func run(data []Data, fn func(Data)) {
-	for _, d := range data {
-		if d.Mime == Mime {
-			fn(d)
-		}
-	}
 }

@@ -1,7 +1,6 @@
 package prospect
 
 import (
-	"bytes"
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/xml"
@@ -10,7 +9,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -130,45 +128,9 @@ type Archive struct {
 	MetaDir string `toml:"metadir"`
 }
 
-func (a Archive) CreateFromCommand(d Data, args []string) (Link, error) {
-	var k Link
-	if len(args) == 0 {
-		return k, nil
-	}
-	args = append(args, d.File)
-	var (
-		buf    bytes.Buffer
-		cmd    = exec.Command(args[0], args[1:]...)
-		sumSHA = sha256.New()
-		sumMD5 = md5.New()
-	)
-	cmd.Stdout = io.MultiWriter(&buf, sumSHA, sumMD5)
-	if err := cmd.Run(); err != nil {
-		return k, err
-	}
-	file := filepath.Join(d.Resolve(), filepath.Base(d.File))
-
-	d.Parameters = d.Parameters[:0]
-	d.Links = append(d.Links, Link{File: file, Role: TypeData})
-	d.Level++
-	d.Type = TypeCommand
-	d.Mime = MimePlain
-	d.Sum = fmt.Sprintf("%x", sumSHA.Sum(nil))
-	d.MD5 = fmt.Sprintf("%x", sumMD5.Sum(nil))
-	d.Size = int64(buf.Len())
-
-	d.File = file + "." + filepath.Base(args[0])
-	if err := a.storeFile(d, buf.Bytes()); err != nil {
-		return k, err
-	}
-	k.File = d.File
-	k.Role = TypeCommand
-	return k, a.storeMeta(d, d.File)
-}
-
 func (a Archive) CreateFile(d Data, buf []byte) (Link, error) {
 	var k Link
-	d.File = filepath.Join(d.Resolve(), filepath.Join(d.File))
+	d.File = filepath.Join(d.Resolve(), filepath.Base(d.File))
 	if err := a.storeFile(d, buf); err != nil {
 		return k, err
 	}
@@ -277,6 +239,34 @@ type Data struct {
 
 	Size int64
 	MD5  string
+}
+
+func ReadFile(d *Data, file string) error {
+	d.File = file
+	r, err := os.Open(d.File)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	return ReadFrom(d, r)
+}
+
+func ReadFrom(d *Data, r io.Reader) error {
+	var (
+		sumSHA = sha256.New()
+		sumMD5 = md5.New()
+		err error
+	)
+	if d.Size, err = io.Copy(io.MultiWriter(sumSHA, sumMD5), r); err != nil {
+		return err
+	}
+
+	d.Integrity = SHA
+	d.Sum = fmt.Sprintf("%x", sumSHA.Sum(nil))
+	d.MD5 = fmt.Sprintf("%x", sumMD5.Sum(nil))
+
+	return err
 }
 
 func (d Data) Resolve() string {

@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	CmdName = "command.name"
-	CmdArgs = "command.args"
+	CmdName    = "command.name"
+	CmdArgs    = "command.args"
 	CmdVersion = "command.version"
 )
 
@@ -30,7 +30,7 @@ type Command struct {
 }
 
 func (c Command) Exec(d Data) (Data, []byte, error) {
-	if !c.accept(filepath.Ext(d.File)) {
+	if !c.can(filepath.Ext(d.File)) {
 		return d, nil, nil
 	}
 	var (
@@ -58,7 +58,7 @@ func (c Command) Exec(d Data) (Data, []byte, error) {
 
 	ps := []Parameter{
 		MakeParameter(CmdName, filepath.Base(c.Path)),
-		MakeParameter(CmdArgs, strings.Join(args, " ")),
+		MakeParameter(CmdArgs, strings.Join(c.Args, " ")),
 	}
 	d.Parameters = append(d.Parameters, ps...)
 
@@ -71,7 +71,7 @@ func (c Command) Exec(d Data) (Data, []byte, error) {
 	return d, buf.Bytes(), nil
 }
 
-func (c Command) accept(ext string) bool {
+func (c Command) can(ext string) bool {
 	sort.Strings(c.Extensions)
 	x := sort.SearchStrings(c.Extensions, ext)
 	return x < len(c.Extensions) && c.Extensions[x] == ext
