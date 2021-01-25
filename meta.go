@@ -236,7 +236,7 @@ func (c Context) Update(d Data) Data {
 	if d.Owner == "" {
 		d.Owner = c.Owner
 	}
-	if !d.AcqTime.IsZero() && len(d.Increments) == 0 && len(c.Increments) > 0 {
+	if !d.AcqTime.IsZero() && len(c.Increments) > 0 {
 		x := sort.Search(len(c.Increments), func(i int) bool {
 			return c.Increments[i].Contains(d.AcqTime)
 		})
