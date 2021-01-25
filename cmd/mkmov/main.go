@@ -77,7 +77,7 @@ func extractMeta(d *prospect.Data) error {
 	d.AcqTime = p.AcqTime()
 	d.ModTime = p.ModTime()
 
-	a := prospect.MakeParameter("video.duration", p.Length())
+	a := prospect.MakeParameter(prospect.FileDuration, p.Length())
 	d.Parameters = append(d.Parameters, a)
 
 	return nil

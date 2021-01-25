@@ -1,6 +1,7 @@
 package prospect
 
 import (
+	"compress/gzip"
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/xml"
@@ -18,10 +19,14 @@ import (
 const (
 	SHA = "SHA256"
 
-	MimePlain   = "text/plain"
-	MimeOctet   = "application/octet-stream"
-	MimeQuick   = "video/quicktime"
-	MimeJpeg    = "image/jpeg"
+	ExtGZ = ".gz"
+
+	MimePlain = "text/plain"
+	MimeOctet = "application/octet-stream"
+	MimeQuick = "video/quicktime"
+	MimeJpeg  = "image/jpeg"
+	MimeCsv   = "text/csv"
+
 	TypeCommand = "command output"
 	TypeImage   = "image"
 	TypeVideo   = "video"
@@ -34,6 +39,9 @@ const (
 	ptrRole  = "ptr.%d.role"
 	fileSize = "file.size"
 	fileMD5  = "file.md5"
+
+	FileDuration = "file.duration"
+	FileRecord   = "file.numrec"
 )
 
 type MimeSet []Mime
@@ -231,7 +239,7 @@ func (c Context) Update(d Data) Data {
 	if d.Owner == "" {
 		d.Owner = c.Owner
 	}
-	if len(d.Increments) == 0 && len(c.Increments) > 0 {
+	if !d.AcqTime.IsZero() && len(d.Increments) == 0 && len(c.Increments) > 0 {
 		x := sort.Search(len(c.Increments), func(i int) bool {
 			return c.Increments[i].Contains(d.AcqTime)
 		})
@@ -272,11 +280,19 @@ type Data struct {
 
 func ReadFile(d *Data, file string) error {
 	d.File = file
-	r, err := os.Open(d.File)
+	f, err := os.Open(d.File)
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	defer f.Close()
+
+	var r io.Reader = f
+	if filepath.Ext(file) == ExtGZ {
+		r, err = gzip.NewReader(r)
+		if err != nil {
+			return err
+		}
+	}
 
 	m := d.Mimes.Get(filepath.Ext(file))
 	if !m.isZero() {
