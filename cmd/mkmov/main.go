@@ -20,7 +20,6 @@ import (
 const Mime = "video/quicktime"
 
 type Data struct {
-	Archive string
 	prospect.Data
 }
 
@@ -79,13 +78,13 @@ func main() {
 				log.Printf("fail to process %s: %s", d.File, err)
 				return nil
 			}
-			k, err := c.CreateFromCommand(d.Data, d.Archive, c.Exif)
+			k, err := c.CreateFromCommand(d.Data, c.Exif)
 			if err != nil {
 				log.Printf("fail to execute command %s %s: %s", strings.Join(c.Exif, " "), d.File, err)
 				return err
 			}
 			d.Links = append(d.Links, k)
-			if err := c.Store(d.Data, d.Archive); err != nil {
+			if err := c.Store(d.Data); err != nil {
 				log.Printf("fail to store %s: %s", d.File, err)
 				return nil
 			}

@@ -30,7 +30,6 @@ const (
 
 type Data struct {
 	prospect.Data
-	Archive string
 }
 
 func (d Data) Process(file string) (Data, error) {
@@ -98,32 +97,32 @@ func main() {
 			if err != nil {
 				return nil
 			}
-			k, err := c.CreateFromCommand(x.Data, x.Archive, c.Exif)
+			k, err := c.CreateFromCommand(x.Data, c.Exif)
 			if err != nil {
 				return err
 			}
 			x.Links = append(x.Links, k)
-			if err := c.Store(x.Data, x.Archive); err != nil {
+			if err := c.Store(x.Data); err != nil {
 				return nil
 			}
 
 			d.AcqTime = x.AcqTime
 			d.ModTime = x.ModTime
-			d.Links = append(d.Links, prospect.CreateLinkFrom(x.Data, d.Archive))
+			d.Links = append(d.Links, prospect.CreateLinkFrom(x.Data))
 			extractImage(file, func(base string, f *nef.File) error {
 				d.Parameters, d.File = d.Parameters[:0], base
 				buf, err := updateDataFromImage(f, &d)
 				if err != nil {
 					return err
 				}
-				k, err = c.CreateFile(d.Data, d.Archive, buf)
+				k, err = c.CreateFile(d.Data, buf)
 				if err == nil {
 					k.Role = d.Type
 					x.Links = append(x.Links, k)
 				}
 				return err
 			})
-			return c.Store(x.Data, x.Archive)
+			return c.Store(x.Data)
 		})
 	})
 }

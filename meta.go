@@ -113,8 +113,8 @@ type Link struct {
 	Role string
 }
 
-func CreateLinkFrom(d Data, pattern string) Link {
-	file := Resolve(d, pattern)
+func CreateLinkFrom(d Data) Link {
+	file := filepath.Join(d.Resolve(), filepath.Base(d.File))
 	return CreateLink(file, d.Type)
 }
 
@@ -130,7 +130,7 @@ type Archive struct {
 	MetaDir string `toml:"metadir"`
 }
 
-func (a Archive) CreateFromCommand(d Data, pattern string, args []string) (Link, error) {
+func (a Archive) CreateFromCommand(d Data, args []string) (Link, error) {
 	var k Link
 	if len(args) == 0 {
 		return k, nil
@@ -146,11 +146,7 @@ func (a Archive) CreateFromCommand(d Data, pattern string, args []string) (Link,
 	if err := cmd.Run(); err != nil {
 		return k, err
 	}
-	r, err := ParseResolver(pattern)
-	if err != nil {
-		return k, err
-	}
-	file := filepath.Join(r.Resolve(d), filepath.Base(d.File))
+	file := filepath.Join(d.Resolve(), filepath.Base(d.File))
 
 	d.Parameters = d.Parameters[:0]
 	d.Links = append(d.Links, Link{File: file, Role: TypeData})
@@ -170,13 +166,9 @@ func (a Archive) CreateFromCommand(d Data, pattern string, args []string) (Link,
 	return k, a.storeMeta(d, d.File)
 }
 
-func (a Archive) CreateFile(d Data, pattern string, buf []byte) (Link, error) {
+func (a Archive) CreateFile(d Data, buf []byte) (Link, error) {
 	var k Link
-	r, err := ParseResolver(pattern)
-	if err != nil {
-		return k, err
-	}
-	d.File = filepath.Join(r.Resolve(d), filepath.Join(d.File))
+	d.File = filepath.Join(d.Resolve(), filepath.Join(d.File))
 	if err := a.storeFile(d, buf); err != nil {
 		return k, err
 	}
@@ -185,12 +177,8 @@ func (a Archive) CreateFile(d Data, pattern string, buf []byte) (Link, error) {
 	return k, a.storeMeta(d, d.File)
 }
 
-func (a Archive) Store(d Data, pattern string) error {
-	r, err := ParseResolver(pattern)
-	if err != nil {
-		return err
-	}
-	file := filepath.Join(r.Resolve(d), filepath.Base(d.File))
+func (a Archive) Store(d Data) error {
+	file := filepath.Join(d.Resolve(), filepath.Base(d.File))
 	if err := a.storeLink(d, file); err != nil {
 		return err
 	}
@@ -282,6 +270,7 @@ type Data struct {
 	File       string
 	ModTime    time.Time
 	AcqTime    time.Time
+	Archive    Pattern
 
 	Parameters []Parameter `toml:"metadata"`
 	Links      []Link      `toml:"links"`
@@ -290,11 +279,11 @@ type Data struct {
 	MD5  string
 }
 
-func (d Data) ToLink() Link {
-	return Link{
-		File: d.File,
-		Role: d.Type,
+func (d Data) Resolve() string {
+	if d.Archive.Resolver == nil {
+		return ""
 	}
+	return d.Archive.Resolve(d)
 }
 
 func (d Data) Accept(file string) bool {

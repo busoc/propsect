@@ -12,14 +12,6 @@ type Resolver interface {
 	fmt.Stringer
 }
 
-func Resolve(d Data, str string) string {
-	r, err := ParseResolver(str)
-	if err != nil {
-		return d.File
-	}
-	return filepath.Join(r.Resolve(d), filepath.Base(d.File))
-}
-
 type Pattern struct {
 	Resolver
 }
