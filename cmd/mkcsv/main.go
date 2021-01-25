@@ -44,6 +44,7 @@ func collectData(b prospect.Builder, d prospect.Data) {
 		if err != nil || i.IsDir() || !d.Accept(file) {
 			return err
 		}
+    log.Printf("start processing %s", d.File)
 		d, err := processData(d, file)
 		if err != nil {
 			log.Printf("fail to process %s: %s", d.File, err)
