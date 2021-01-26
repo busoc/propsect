@@ -24,7 +24,11 @@ func OpenFile(file string) (io.ReadCloser, error) {
 			return nil, err
 		}
 	}
-	return NopCloser(r), nil
+	rc := readcloser{
+		Reader: r,
+		closer: f,
+	}
+	return &rc, nil
 }
 
 type Builder struct {
@@ -91,15 +95,12 @@ func (b Builder) ExecuteCommands(d Data) ([]Link, error) {
 
 type readcloser struct {
 	io.Reader
-}
-
-func NopCloser(r io.Reader) io.ReadCloser {
-	return &readcloser{Reader: r}
+	closer io.Closer
 }
 
 func (r *readcloser) Close() error {
-	if c, ok := r.Reader.(io.Closer); ok {
-		return c.Close()
+	if c, ok := r.Reader.(*gzip.Reader); ok {
+		c.Close()
 	}
-	return nil
+	return r.closer.Close()
 }

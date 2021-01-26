@@ -29,6 +29,10 @@ const (
 	TypeVideo   = "video"
 	TypeText    = "text"
 	TypeData    = "data"
+
+	TypePTH = "Medium Rate Telemetry"
+	TypePDH = "Processed Data"
+	TypeHRD = "High Rate Data"
 )
 
 const (
@@ -39,6 +43,8 @@ const (
 
 	FileDuration = "file.duration"
 	FileRecord   = "file.numrec"
+	FileInvalid  = "file.invalid"
+	FileMissing  = "file.missing"
 )
 
 type MimeSet []Mime

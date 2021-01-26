@@ -44,7 +44,7 @@ func collectData(b prospect.Builder, d prospect.Data) {
 		if err != nil || i.IsDir() || !d.Accept(file) {
 			return err
 		}
-    log.Printf("start processing %s", d.File)
+		log.Printf("start processing %s", d.File)
 		d, err := processData(d, file)
 		if err != nil {
 			log.Printf("fail to process %s: %s", d.File, err)
@@ -67,17 +67,17 @@ func processData(d prospect.Data, file string) (prospect.Data, error) {
 }
 
 func readFile(d prospect.Data) (prospect.Data, error) {
-  r, err := prospect.OpenFile(d.File)
-  if err != nil {
-    return d, err
-  }
+	r, err := prospect.OpenFile(d.File)
+	if err != nil {
+		return d, err
+	}
 
 	rs := csv.NewReader(r)
 	rs.Comma = getDelimiter(d.Mime)
 	rs.ReuseRecord = true
 
 	row, err := rs.Read()
-  fmt.Println(row, err)
+	fmt.Println(row, err)
 	if err != nil {
 		return d, err
 	}
@@ -115,7 +115,7 @@ func getDelimiter(str string) rune {
 
 	switch mt.Params["delimiter"] {
 	default:
-    return ','
+		return ','
 	case "tab", "\t":
 		return '\t'
 	case "space", " ":
