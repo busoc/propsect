@@ -45,6 +45,10 @@ const (
 	FileRecord   = "file.numrec"
 	FileInvalid  = "file.invalid"
 	FileMissing  = "file.missing"
+	FileEncoding = "file.encoding"
+
+	ImageWidth  = "image.width"
+	ImageHeight = "image.height"
 )
 
 type MimeSet []Mime
@@ -319,6 +323,25 @@ func ReadFrom(d *Data, r io.Reader) error {
 	d.MD5 = fmt.Sprintf("%x", sumMD5.Sum(nil))
 
 	return err
+}
+
+func (d Data) Clone() Data {
+	x := d
+	x.Parameters = make([]Parameter, len(d.Parameters))
+	copy(x.Parameters, d.Parameters)
+
+	x.Links = make([]Link, len(d.Links))
+	copy(x.Links, d.Links)
+
+	return x
+}
+
+func (d Data) Register(name string, value interface{}) {
+	if name == "" || value == nil {
+		return
+	}
+	p := MakeParameter(name, value)
+	d.Parameters = append(d.Parameters, p)
 }
 
 func (d Data) Resolve() string {

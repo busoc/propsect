@@ -84,9 +84,13 @@ func (b Builder) ExecuteCommands(d Data) ([]Link, error) {
 		if err != nil || len(buf) == 0 {
 			continue
 		}
+		x.Links = append(x.Links, CreateLinkFrom(d))
 		k, err := b.CreateFile(x, buf)
 		if err != nil {
 			continue
+		}
+		if k.Role == "" {
+			k.Role = TypeCommand
 		}
 		ks = append(ks, k)
 	}
