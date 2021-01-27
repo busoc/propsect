@@ -232,6 +232,9 @@ type Context struct {
 	Source     string
 	Owner      string
 
+	AcqTime time.Time
+	ModTime time.Time
+
 	Increments []Increment `toml:"increment"`
 	Metadata   []Parameter
 }
@@ -260,6 +263,14 @@ func (c Context) Update(d Data) Data {
 			d.Increments = append(d.Increments, c.Increments[x].Num)
 		}
 	}
+
+	if d.AcqTime.IsZero() {
+		d.AcqTime = c.AcqTime
+	}
+	if d.ModTime.IsZero() {
+		d.ModTime = c.ModTime
+	}
+	
 	d.Parameters = append(d.Parameters, c.Metadata...)
 	return d
 }
