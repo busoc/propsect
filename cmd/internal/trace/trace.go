@@ -51,7 +51,7 @@ func (t *Tracer) Done(file string, d prospect.Data) {
 
 func (t *Tracer) Error(file string, err error) {
 	t.err++
-	t.Trace("error while processing %s: %s", err)
+	t.Trace("error while processing %s: %s", file, err)
 }
 
 func (t *Tracer) Trace(msg string, args ...interface{}) {

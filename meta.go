@@ -283,6 +283,7 @@ type Data struct {
 	Archive    Pattern
 
 	Mimes MimeSet `toml:"mimetype"`
+	TimeFunc `toml:"file2time"`
 
 	Parameters []Parameter `toml:"metadata"`
 	Links      []Link      `toml:"links"`
@@ -308,7 +309,18 @@ func ReadFile(d *Data, file string) error {
 			d.Mime = m.Mime
 		}
 	}
-	return ReadFrom(d, r)
+	d, err := ReadFrom(d, r)
+	if err != nil {
+		return err
+	}
+	if d.AcqTime.IsZero() {
+		when, err := d.TimeFunc.GetYime(file)
+		if err == nil {
+			d.AcqTime = when
+			d.ModTime = when
+		}
+	}
+	return nil
 }
 
 func ReadFrom(d *Data, r io.Reader) error {
