@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+  "path/filepath"
 )
 
 const (
@@ -23,13 +24,13 @@ type TimeFunc struct {
 func (tp *TimeFunc) Set(str string) error {
 	switch strings.ToLower(str) {
 	case "", TimeFormatNow:
-		tf.parseTime = TimeNow
+		tp.parseTime = TimeNow
 	case TimeFormatRT, TimeFormatYDH:
-		tf.parseTime = TimeRT
-	case TimeFormatHDKLong, TimeFormatShort:
-		tf.parseTime = TimeHDK
+		tp.parseTime = TimeRT
+	case TimeFormatHDKLong, TimeFormatHDKShort:
+		tp.parseTime = TimeHDK
 	case TimeFormatYD:
-		tf.parseTime = TimeYearDoy
+		tp.parseTime = TimeYearDoy
 	default:
 		return fmt.Errorf("%s: unknown format", str)
 	}
@@ -67,7 +68,7 @@ func TimeRT(file string) (time.Time, error) {
 		str   = timeFromFile(file, level3, false)
 		parts = strings.Split(filepath.Base(file), "_")
 	)
-	return time.Parse(patRt, fmt.Sprintf("%s-%s", str, parts[1])), nil
+	return time.Parse(patRt, fmt.Sprintf("%s-%s", str, parts[1]))
 }
 
 func TimeHDK(file string) (time.Time, error) {

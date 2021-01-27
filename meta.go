@@ -309,12 +309,11 @@ func ReadFile(d *Data, file string) error {
 			d.Mime = m.Mime
 		}
 	}
-	d, err := ReadFrom(d, r)
-	if err != nil {
+	if err = ReadFrom(d, r); err != nil {
 		return err
 	}
 	if d.AcqTime.IsZero() {
-		when, err := d.TimeFunc.GetYime(file)
+		when, err := d.TimeFunc.GetTime(file)
 		if err == nil {
 			d.AcqTime = when
 			d.ModTime = when
