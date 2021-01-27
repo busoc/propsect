@@ -15,6 +15,8 @@ import (
 	"time"
 )
 
+var ErrIgnore = errors.New("ignore")
+
 const (
 	SHA = "SHA256"
 

@@ -78,13 +78,11 @@ func readFile(d prospect.Data) (prospect.Data, error) {
 	rs.ReuseRecord = true
 
 	row, err := rs.Read()
-	fmt.Println(row, err)
 	if err != nil {
 		return d, err
 	}
 	for i := range row {
-		p := prospect.MakeParameter(fmt.Sprintf(fileHeader, i+1), row[i])
-		d.Parameters = append(d.Parameters, p)
+		d.Register(fmt.Sprintf(fileHeader, i+1), row[i])
 	}
 
 	var count int
@@ -102,9 +100,11 @@ func readFile(d prospect.Data) (prospect.Data, error) {
 		d.ModTime, err = time.Parse(TimePattern, row[0])
 		count++
 	}
-	delta := d.ModTime.Sub(d.AcqTime)
-	d.Parameters = append(d.Parameters, prospect.MakeParameter(prospect.FileDuration, delta))
-	d.Parameters = append(d.Parameters, prospect.MakeParameter(prospect.FileRecord, count))
+	if count == 0 {
+		return d, prospect.ErrIgnore
+	}
+	d.Register(prospect.FileDuration, d.ModTime.Sub(d.AcqTime))
+	d.Register(prospect.FileRecord, count)
 	return d, nil
 }
 
