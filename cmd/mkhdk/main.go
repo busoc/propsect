@@ -18,15 +18,16 @@ import (
 const (
 	mimeImage   = "application/x-hadock-image"
 	mimeScience = "application/x-hadock-science"
-	epoch = time.Date(1980, 1, 1, 0, 0, 0, 0, time.UTC)
 )
+
+var epoch = time.Date(1980, 1, 1, 0, 0, 0, 0, time.UTC)
 
 func main() {
 	flag.Parse()
 
 	accept := func(d prospect.Data) bool {
 		if d.Level == 1 {
-			return d.Mime == prospect.MimePng || d.Mime == prospect.Jpeg
+			return d.Mime == prospect.MimePng || d.Mime == prospect.MimeJpeg
 		}
 		return d.Mime == mimeImage || d.Mime == mimeScience
 	}
@@ -128,7 +129,6 @@ func processData(d prospect.Data, file string) (prospect.Data, error) {
 			return d, err
 		}
 	}
-
 	if err := updateMetadataFromXML(&d); err != nil {
 		return d, err
 	}
@@ -201,6 +201,12 @@ func parseFilename(d *prospect.Data) {
 
 	if bad := filepath.Ext(d.File) == ".bad"; bad {
 		d.Register(prospect.FileInvalid, bad)
+	}
+
+	if d.AcqTime.IsZero() {
+		when, _ := time.Parse("20060102150405", parts[len(parts)-3]+parts[len(parts)-2])
+		d.AcqTime = when
+		d.ModTime = when
 	}
 }
 
