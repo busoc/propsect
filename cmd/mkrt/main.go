@@ -7,29 +7,40 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/busoc/prospect"
+	"github.com/busoc/prospect/cmd/internal/trace"
 	"github.com/busoc/rt"
 	"github.com/busoc/timutil"
 	"github.com/midbel/mime"
+)
+
+const (
+	pth = "pth"
+	pdh = "pdh"
+	hrd = "hrd"
+	vmu = "vmu"
 )
 
 func main() {
 	flag.Parse()
 
 	accept := func(d prospect.Data) bool {
+		switch strings.ToLower(d.Type) {
+		default:
+		case strings.ToLower(prospect.TypePTH), strings.ToLower(prospect.TypePDH), strings.ToLower(prospect.TypeHRD):
+			return true
+		}
 		mt, err := mime.Parse(d.Mime)
 		if err != nil {
-			fmt.Println(mt.Params, mt.MainType, mt.SubType, err)
 			return false
 		}
 		switch strings.ToLower(mt.Params["type"]) {
-		case "pth", "pdh", "hrd":
+		case pth, pdh, hrd, vmu:
 		default:
 			return false
 		}
@@ -43,24 +54,27 @@ func main() {
 }
 
 func collectData(b prospect.Builder, d prospect.Data) {
-	buffer := make([]byte, 8<<20)
+	var (
+		buffer = make([]byte, 8<<20)
+		tracer = trace.New("mkrt")
+	)
 	filepath.Walk(d.File, func(file string, i os.FileInfo, err error) error {
 		if err != nil || i.IsDir() || !d.Accept(file) {
 			return err
 		}
-		now := time.Now()
+		dat := d.Clone()
 
-		log.Printf("start processing %s", d.File)
-		d, err := processData(d, file, buffer)
+		tracer.Start(file)
+		dat, err = processData(dat, file, buffer)
 		if err != nil {
-			log.Printf("fail to update %s: %s", d.File, err)
+			tracer.Error(file, err)
 			return nil
 		}
-		if err := b.Store(d); err != nil {
-			log.Printf("fail to store %s: %s", d.File, err)
+		if err := b.Store(dat); err != nil {
+			tracer.Error(file, err)
 			return nil
 		}
-		log.Printf("done %s (%d - %s - %s)", d.File, d.Size, time.Since(now), d.MD5)
+		tracer.Done(file, dat)
 		return nil
 	})
 }
@@ -84,7 +98,7 @@ func processData(d prospect.Data, file string, buffer []byte) (prospect.Data, er
 	for i := 0; ; i++ {
 		if _, err := rs.Read(buffer); err != nil {
 			if !errors.Is(err, io.EOF) {
-				d.Parameters = append(d.Parameters, prospect.MakeParameter(prospect.FileInvalid, true))
+				d.Register(prospect.FileInvalid, true)
 			}
 			break
 		}
@@ -95,9 +109,15 @@ func processData(d prospect.Data, file string, buffer []byte) (prospect.Data, er
 		count++
 	}
 	delta := d.ModTime.Sub(d.AcqTime)
-	d.Parameters = append(d.Parameters, prospect.MakeParameter(prospect.FileDuration, delta))
-	d.Parameters = append(d.Parameters, prospect.MakeParameter(prospect.FileRecord, count))
+	d.Register(prospect.FileDuration, delta)
+	d.Register(prospect.FileRecord, count)
 	return d, nil
+}
+
+type info struct {
+	Id   int
+	Seq  int
+	When time.Time
 }
 
 func getTimeFunc(str string) func([]byte) time.Time {

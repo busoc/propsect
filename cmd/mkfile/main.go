@@ -3,12 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/busoc/prospect"
+	"github.com/busoc/prospect/cmd/internal/trace"
 )
 
 func main() {
@@ -22,28 +21,26 @@ func main() {
 }
 
 func collectData(b prospect.Builder, d prospect.Data) {
+	tracer := trace.New("mkfile")
+	defer tracer.Summarize()
 	filepath.Walk(d.File, func(file string, i os.FileInfo, err error) error {
-		now := time.Now()
-		if err != nil {
+		if err != nil || i.IsDir() {
 			return err
 		}
-		if i.IsDir() {
-			return nil
-		}
-		d.File = file
+		dat := d.Clone()
+		dat.File = file
 
-		log.Printf("start processing %s", d.File)
-		d, err := processData(d)
-		if err != nil {
-			log.Printf("fail to update %s: %s", d.File, err)
+		tracer.Start(file)
+		if dat, err = processData(dat); err != nil {
+			tracer.Error(file, err)
 			return nil
 		}
-		d = b.GetMime(d)
-		if err := b.Store(d); err != nil {
-			log.Printf("fail to store %s: %s", d.File, err)
+		dat = b.GetMime(dat)
+		if err := b.Store(dat); err != nil {
+			tracer.Error(file, err)
 			return nil
 		}
-		log.Printf("done %s (%d - %s - %s)", d.File, d.Size, time.Since(now), d.MD5)
+		tracer.Done(file, dat)
 		return nil
 	})
 }

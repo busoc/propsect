@@ -56,20 +56,21 @@ func (c Command) Exec(d Data) (Data, []byte, error) {
 	d.File = d.File + c.Ext
 	d.ModTime = time.Now()
 
-	ps := []Parameter{
-		MakeParameter(CmdName, filepath.Base(c.Path)),
-		MakeParameter(CmdArgs, strings.Join(c.Args, " ")),
+	d.Register(CmdName, filepath.Base(c.Path))
+	if len(c.Args) > 0 {
+		d.Register(CmdArgs, strings.Join(c.Args, " "))
 	}
-	d.Parameters = append(d.Parameters, ps...)
 
 	if c.Version != "" {
 		cmd = exec.Command(c.Path, c.Version)
 		if buf, err := cmd.Output(); err == nil && len(buf) > 0 {
-			d.Parameters = append(d.Parameters, MakeParameter(CmdVersion, string(buf)))
+			d.Register(CmdVersion, string(buf))
 		}
 	}
 	return d, buf.Bytes(), nil
 }
+
+// 114.74
 
 func (c Command) can(ext string) bool {
 	sort.Strings(c.Extensions)

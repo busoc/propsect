@@ -336,7 +336,7 @@ func (d Data) Clone() Data {
 	return x
 }
 
-func (d Data) Register(name string, value interface{}) {
+func (d *Data) Register(name string, value interface{}) {
 	if name == "" || value == nil {
 		return
 	}

@@ -10,14 +10,12 @@ import (
 	"strings"
 
 	"github.com/busoc/prospect"
+	"github.com/busoc/prospect/cmd/internal/trace"
 	"github.com/midbel/exif/nef"
 )
 
 const (
 	Mime = "image/x-nikon-nef"
-
-	ImgWidth  = "image.width"
-	ImgHeight = "image.height"
 
 	ExtDAT = ".dat"
 	ExtJPG = ".jpg"
@@ -37,40 +35,53 @@ func main() {
 }
 
 func collectData(b prospect.Builder, d prospect.Data) {
+	tracer := trace.New("mknef")
+	defer tracer.Summarize()
 	filepath.Walk(d.File, func(file string, i os.FileInfo, err error) error {
 		if err != nil || i.IsDir() || !d.Accept(file) {
 			return err
 		}
-		x, err := processData(d, file)
-		if err != nil {
+		dat := d.Clone()
+
+		tracer.Start(file)
+		if dat, err = processData(dat, file); err != nil {
+			tracer.Error(file, err)
 			return nil
 		}
-		ks, err := b.ExecuteCommands(x)
+		ks, err := b.ExecuteCommands(dat)
 		if err != nil {
+			tracer.Error(file, err)
 			return nil
 		}
-		x.Links = append(x.Links, ks...)
-		if err := b.Store(x); err != nil {
+		dat.Links = append(dat.Links, ks...)
+		if err := b.Store(dat); err != nil {
+			tracer.Error(file, err)
 			return nil
 		}
 
-		d.AcqTime = x.AcqTime
-		d.ModTime = x.ModTime
-		d.Links = append(d.Links, prospect.CreateLinkFrom(x))
+		d.AcqTime = dat.AcqTime
+		d.ModTime = dat.ModTime
+		d.Links = append(d.Links, prospect.CreateLinkFrom(dat))
 		extractImages(file, func(base string, f *nef.File) error {
-			d.Parameters, d.File = d.Parameters[:0], base
+			d := dat.Clone()
 			buf, err := updateDataFromImage(f, &d)
 			if err != nil {
+				tracer.Error(file, err)
 				return err
 			}
 			k, err := b.CreateFile(d, buf)
 			if err == nil {
 				k.Role = d.Type
-				x.Links = append(x.Links, k)
+				dat.Links = append(dat.Links, k)
 			}
 			return err
 		})
-		return b.Store(x)
+		if err := b.Store(dat); err != nil {
+			tracer.Error(file, err)
+			return nil
+		}
+		tracer.Done(file, dat)
+		return nil
 	})
 }
 
@@ -113,10 +124,8 @@ func updateDataFromImage(f *nef.File, d *prospect.Data) ([]byte, error) {
 		ext = ExtJPG
 
 		cfg, _ := jpeg.DecodeConfig(bytes.NewReader(buf))
-		d.Parameters = []prospect.Parameter{
-			prospect.MakeParameter(ImgWidth, cfg.Width),
-			prospect.MakeParameter(ImgHeight, cfg.Height),
-		}
+		d.Register(prospect.ImageWidth, cfg.Width)
+		d.Register(prospect.ImageHeight, cfg.Height)
 	}
 	if err != nil {
 		return nil, err

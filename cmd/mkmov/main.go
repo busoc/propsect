@@ -3,12 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/busoc/prospect"
+	"github.com/busoc/prospect/cmd/internal/trace"
 	"github.com/midbel/exif/mov"
 )
 
@@ -28,27 +27,30 @@ func main() {
 }
 
 func collectData(b prospect.Builder, d prospect.Data) {
+	tracer := trace.New("mkmov")
+	defer tracer.Summarize()
 	filepath.Walk(d.File, func(file string, i os.FileInfo, err error) error {
-		now := time.Now()
 		if err != nil || i.IsDir() || !d.Accept(file) {
 			return err
 		}
-		log.Printf("start processing %s", d.File)
-		d, err := processData(d, file)
+		tracer.Start(file)
+
+		dat := d.Clone()
+		if dat, err = processData(dat, file); err != nil {
+			tracer.Error(file, err)
+			return nil
+		}
+		ks, err := b.ExecuteCommands(dat)
 		if err != nil {
-			log.Printf("fail to process %s: %s", d.File, err)
+			tracer.Error(file, err)
 			return nil
 		}
-		ks, err := b.ExecuteCommands(d)
-		if err != nil {
+		dat.Links = append(dat.Links, ks...)
+		if err := b.Store(dat); err != nil {
+			tracer.Error(file, err)
 			return nil
 		}
-		d.Links = append(d.Links, ks...)
-		if err := b.Store(d); err != nil {
-			log.Printf("fail to store %s: %s", d.File, err)
-			return nil
-		}
-		log.Printf("done processing %s (%d - %s - %s)", d.File, d.Size, time.Since(now), d.MD5)
+		tracer.Done(file, dat)
 		return nil
 	})
 }
