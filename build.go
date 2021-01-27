@@ -31,7 +31,12 @@ func OpenFile(file string) (io.ReadCloser, error) {
 	return &rc, nil
 }
 
+type RunFunc func(Builder, Data)
+
+type AcceptFunc func(Data) bool
+
 type Builder struct {
+	Include string `toml:"include"`
 	Archive
 	Context
 	Mimes    MimeSet   `toml:"mimetype"`
@@ -39,13 +44,9 @@ type Builder struct {
 	Data     []Data    `toml:"file"`
 }
 
-type RunFunc func(Builder, Data)
-
-type AcceptFunc func(Data) bool
-
 func Build(file string, run RunFunc, accept AcceptFunc) error {
-	var b Builder
-	if err := toml.DecodeFile(file, &b); err != nil {
+	b, err := Load(file)
+	if err != nil {
 		return err
 	}
 	if accept == nil {
@@ -95,6 +96,20 @@ func (b Builder) ExecuteCommands(d Data) ([]Link, error) {
 		ks = append(ks, k)
 	}
 	return ks, nil
+}
+
+func Load(file string) (Builder, error) {
+	var b Builder
+	if err := toml.DecodeFile(file, &b); err != nil {
+		return b, err
+	}
+	if r, err := os.Open(b.Include); err == nil {
+		defer r.Close()
+		if err := toml.Decode(r, &b.Context); err != nil {
+			return b, err
+		}
+	}
+	return b, nil
 }
 
 type readcloser struct {

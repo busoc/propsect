@@ -283,7 +283,7 @@ type Data struct {
 	Archive    Pattern
 
 	Mimes    MimeSet `toml:"mimetype"`
-	TimeFunc `toml:"file2time"`
+	TimeFunc `toml:"timefunc"`
 
 	Parameters []Parameter `toml:"metadata"`
 	Links      []Link      `toml:"links"`
