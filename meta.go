@@ -282,7 +282,7 @@ type Data struct {
 	AcqTime    time.Time
 	Archive    Pattern
 
-	Mimes MimeSet `toml:"mimetype"`
+	Mimes    MimeSet `toml:"mimetype"`
 	TimeFunc `toml:"file2time"`
 
 	Parameters []Parameter `toml:"metadata"`

@@ -2,10 +2,10 @@ package prospect
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
-  "path/filepath"
 )
 
 const (
@@ -38,14 +38,14 @@ func (tp *TimeFunc) Set(str string) error {
 }
 
 func (tp *TimeFunc) GetTime(file string) (time.Time, error) {
-  var (
-    when time.Time
-    err  error
-  )
-  if tp.parseTime != nil {
-    when, err = tp.parseTime(file)
-  }
-  return when, err
+	var (
+		when time.Time
+		err  error
+	)
+	if tp.parseTime != nil {
+		when, err = tp.parseTime(file)
+	}
+	return when, err
 }
 
 const (
@@ -94,7 +94,7 @@ func timeFromFile(file string, levels int, all bool) string {
 		parts = append(parts, file)
 		dir = filepath.Clean(dir)
 	}
-	return reverseJoin
+	return reverseJoin(parts)
 }
 
 func reverseJoin(parts []string) string {
