@@ -16,8 +16,11 @@ import (
 )
 
 const (
-	mimeImage   = "application/x-hadock-image"
-	mimeScience = "application/x-hadock-science"
+	MainType = "application"
+	SubType  = "octet-stream"
+	typType  = "hpkt-vmu2"
+	imgType  = "image"
+	scType   = "science"
 )
 
 var epoch = time.Date(1980, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -29,7 +32,18 @@ func main() {
 		if d.Level == 1 {
 			return d.Mime == prospect.MimePng || d.Mime == prospect.MimeJpeg
 		}
-		return d.Mime == mimeImage || d.Mime == mimeScience
+		mt, err := mime.Parse(d.Mime)
+		if err != nil {
+			return false
+		}
+		if mt.MainType != MainType && mt.SubType != SubType {
+			return false
+		}
+		var (
+			typ = strings.ToLower(mt.Params["type"])
+			sub = strings.ToLower(mt.Params["subtype"])
+		)
+		return typ == typType && (sub == imgType || sub == scType)
 	}
 	err := prospect.Build(flag.Arg(0), collectData, accept)
 	if err != nil {
