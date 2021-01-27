@@ -22,6 +22,7 @@ const (
 	MimeOctet = "application/octet-stream"
 	MimeQuick = "video/quicktime"
 	MimeJpeg  = "image/jpeg"
+	MimePng   = "image/png"
 	MimeCsv   = "text/csv"
 
 	TypeCommand = "command output"

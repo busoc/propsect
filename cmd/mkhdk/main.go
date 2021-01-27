@@ -18,12 +18,16 @@ import (
 const (
 	mimeImage   = "application/x-hadock-image"
 	mimeScience = "application/x-hadock-science"
+	epoch = time.Date(1980, 1, 1, 0, 0, 0, 0, time.UTC)
 )
 
 func main() {
 	flag.Parse()
 
 	accept := func(d prospect.Data) bool {
+		if d.Level == 1 {
+			return d.Mime == prospect.MimePng || d.Mime == prospect.Jpeg
+		}
 		return d.Mime == mimeImage || d.Mime == mimeScience
 	}
 	err := prospect.Build(flag.Arg(0), collectData, accept)
@@ -39,6 +43,9 @@ func collectData(b prospect.Builder, d prospect.Data) {
 	filepath.Walk(d.File, func(file string, i os.FileInfo, err error) error {
 		if err != nil || i.IsDir() {
 			return err
+		}
+		if filepath.Ext(file) == ".xml" {
+			return nil
 		}
 		dat := d.Clone()
 
@@ -148,8 +155,8 @@ func updateDataRaw(d *prospect.Data) error {
 	if err := binary.Read(r, binary.BigEndian, &c); err != nil {
 		return err
 	}
-	d.AcqTime = time.Unix(int64(c.Unix), 0)
-	d.ModTime = time.Unix(int64(c.Unix), 0)
+	d.AcqTime = epoch.Add(time.Duration(c.Unix))
+	d.ModTime = epoch.Add(time.Duration(c.Unix))
 
 	fcc := prospect.MakeParameter(fileFCC, strings.TrimSpace(string(c.FCC[:])))
 	d.Parameters = append(d.Parameters, fcc)

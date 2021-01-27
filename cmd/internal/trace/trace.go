@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
-  "path/filepath"
 
 	"github.com/busoc/prospect"
 )
@@ -41,10 +41,10 @@ func (t *Tracer) Summarize() {
 }
 
 func (t *Tracer) Done(file string, d prospect.Data) {
-  var (
-    elapsed = time.Since(t.now)
-    archive = filepath.Join(d.Resolve(), filepath.Base(d.File))
-  )
+	var (
+		elapsed = time.Since(t.now)
+		archive = filepath.Join(d.Resolve(), filepath.Base(d.File))
+	)
 	t.size += float64(d.Size)
 	t.Trace("done processing %s -> %s (%d, %s)", file, archive, d.Size, elapsed)
 }

@@ -50,21 +50,23 @@ const (
 )
 
 const (
-	levelLevel  = "level"
-	levelSource = "source"
-	levelModel  = "model"
-	levelMime   = "mime"
-	levelFormat = "format"
-	levelType   = "type"
-	levelRun    = "run"
-	levelYear   = "year"
-	levelDoy    = "doy"
-	levelMonth  = "month"
-	levelDay    = "day"
-	levelHour   = "hour"
-	levelMin    = "minute"
-	levelSec    = "second"
-	levelStamp  = "timestamp"
+	levelLevel    = "level"
+	levelSource   = "source"
+	levelModel    = "model"
+	levelMime     = "mime"
+	levelFormat   = "format"
+	levelType     = "type"
+	levelRun      = "run"
+	levelYear     = "year"
+	levelDoy      = "doy"
+	levelMonth    = "month"
+	levelDay      = "day"
+	levelHour     = "hour"
+	levelMinLong  = "minute"
+	levelMinShort = "min"
+	levelSecLong  = "second"
+	levelSecShort = "sec"
+	levelStamp    = "timestamp"
 )
 
 func parse(str string) (Resolver, error) {
@@ -279,9 +281,9 @@ func (f fragment) Resolve(dat Data) string {
 		str = fmt.Sprintf("%02d", dat.AcqTime.Day())
 	case levelHour:
 		str = fmt.Sprintf("%02d", dat.AcqTime.Hour())
-	case levelMin:
+	case levelMinShort, levelMinLong:
 		str = fmt.Sprintf("%02d", dat.AcqTime.Minute())
-	case levelSec:
+	case levelSecShort, levelSecLong:
 		str = fmt.Sprintf("%02d", dat.AcqTime.Second())
 	case levelStamp:
 		str = strconv.Itoa(int(dat.AcqTime.Unix()))
