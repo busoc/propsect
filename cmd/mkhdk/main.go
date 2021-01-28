@@ -26,6 +26,7 @@ const (
 var epoch = time.Date(1980, 1, 1, 0, 0, 0, 0, time.UTC)
 
 func main() {
+	skipbad := flag.Bool("skip-bad", false, "don't process files with bad extension")
 	flag.Parse()
 
 	accept := func(d prospect.Data) bool {
@@ -45,39 +46,42 @@ func main() {
 		)
 		return typ == typType && (sub == imgType || sub == scType)
 	}
-	err := prospect.Build(flag.Arg(0), collectData, accept)
+	err := prospect.Build(flag.Arg(0), collectData(*skipbad), accept)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func collectData(b prospect.Builder, d prospect.Data) {
-	tracer := trace.New("mkhdk")
-	defer tracer.Summarize()
-	filepath.Walk(d.File, func(file string, i os.FileInfo, err error) error {
-		if err != nil || i.IsDir() {
-			return err
-		}
-		if filepath.Ext(file) == ".xml" {
-			return nil
-		}
-		dat := d.Clone()
+func collectData(skipbad bool) prospect.RunFunc {
+	return func (b prospect.Builder, d prospect.Data) {
+		tracer := trace.New("mkhdk")
+		defer tracer.Summarize()
+		filepath.Walk(d.File, func(file string, i os.FileInfo, err error) error {
+			if err != nil || i.IsDir() {
+				return err
+			}
+			if filepath.Ext(file) == ".xml" {
+				return nil
+			}
+			dat := d.Clone()
 
-		tracer.Start(file)
-		dat, err = processData(dat, file)
-		if err != nil {
-			tracer.Error(file, err)
+			tracer.Start(file)
+			dat, err = processData(dat, file)
+			if err != nil {
+				tracer.Error(file, err)
+				return nil
+			}
+			if err := b.Store(dat); err != nil {
+				tracer.Error(file, err)
+				return nil
+			}
+			tracer.Done(file, dat)
 			return nil
-		}
-		if err := b.Store(dat); err != nil {
-			tracer.Error(file, err)
-			return nil
-		}
-		tracer.Done(file, dat)
-		return nil
-	})
+		})
+	}
 }
+
 
 const (
 	fileChannel  = "hpkt.vmu2.hci"

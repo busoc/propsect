@@ -26,6 +26,7 @@ const (
 	MimeJpeg  = "image/jpeg"
 	MimePng   = "image/png"
 	MimeCsv   = "text/csv"
+	MimeGz    = "application/gzip"
 
 	TypeCommand = "command output"
 	TypeImage   = "image"
@@ -270,7 +271,7 @@ func (c Context) Update(d Data) Data {
 	if d.ModTime.IsZero() {
 		d.ModTime = c.ModTime
 	}
-	
+
 	d.Parameters = append(d.Parameters, c.Metadata...)
 	return d
 }
@@ -329,6 +330,9 @@ func ReadFile(d *Data, file string) error {
 			d.AcqTime = when
 			d.ModTime = when
 		}
+	}
+	if filepath.Ext(file) == ExtGZ {
+		d.Register(FileEncoding, MimeGz)
 	}
 	return nil
 }
