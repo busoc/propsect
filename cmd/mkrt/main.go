@@ -177,10 +177,10 @@ func getTimeHRD(buf []byte) time.Time {
 		Err       uint16
 		Payload   uint8
 		Channel   uint8
-		AcqCoarse uint32
-		AcqFine   uint8
 		RecCoarse uint32
 		RecFine   uint8
+		AcqCoarse uint32
+		AcqFine   uint8
 	}{}
 	if err := binary.Read(bytes.NewReader(buf), binary.BigEndian, &c); err != nil {
 		return time.Time{}
