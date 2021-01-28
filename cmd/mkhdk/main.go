@@ -24,7 +24,7 @@ const (
 	scType   = "science"
 )
 
-var epoch = time.Date(1980, 1, 1, 0, 0, 0, 0, time.UTC)
+var epoch = time.Date(1980, 1, 6, 0, 0, 0, 0, time.UTC)
 
 func main() {
 	skipbad := flag.Bool("skip-bad", false, "don't process files with bad extension")
@@ -250,29 +250,6 @@ func parseDirname(d *prospect.Data) {
 	}
 }
 
-type metadata struct {
-	PktTime string `xml:"vmu,attr"`
-
-	AcqTime string `xml:"timestamp"`
-	SizeX   int    `xml:"pixels>x"`
-	SizeY   int    `xml:"pixels>y"`
-
-	Region struct {
-		OffsetX int `xml:"offset-x"`
-		SizeX   int `xml:"size-x"`
-		OffsetY int `xml:"offset-y"`
-		SizeY   int `xml:"size-y"`
-	} `xml:"region"`
-
-	Dropping int
-
-	Scale struct {
-		SizeX int `xml:"size-x"`
-		SizeY int `xml:"size-y"`
-	} `xml:"scaling"`
-	Ratio int `xml:"force-aspect-ratio"`
-}
-
 func updateMetadataFromXML(d *prospect.Data) error {
 	r, err := os.Open(d.File + ".xml")
 	if err != nil {
@@ -280,7 +257,28 @@ func updateMetadataFromXML(d *prospect.Data) error {
 	}
 	defer r.Close()
 
-	var m metadata
+	m := struct {
+		PktTime string `xml:"vmu,attr"`
+
+		AcqTime string `xml:"timestamp"`
+		SizeX   int    `xml:"pixels>x"`
+		SizeY   int    `xml:"pixels>y"`
+
+		Region struct {
+			OffsetX int `xml:"offset-x"`
+			SizeX   int `xml:"size-x"`
+			OffsetY int `xml:"offset-y"`
+			SizeY   int `xml:"size-y"`
+		} `xml:"region"`
+
+		Dropping int
+
+		Scale struct {
+			SizeX int `xml:"size-x"`
+			SizeY int `xml:"size-y"`
+		} `xml:"scaling"`
+		Ratio int `xml:"force-aspect-ratio"`
+	}{}
 	if err := xml.NewDecoder(r).Decode(&m); err != nil {
 		return err
 	}
