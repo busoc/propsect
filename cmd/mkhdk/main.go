@@ -13,6 +13,7 @@ import (
 
 	"github.com/busoc/prospect"
 	"github.com/busoc/prospect/cmd/internal/trace"
+	"github.com/midbel/mime"
 )
 
 const (
