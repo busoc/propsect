@@ -220,7 +220,16 @@ func (a Archive) storeLink(d Data, file string) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
-	err := os.Link(d.File, file)
+	var err error
+	switch strings.ToLower(d.Link) {
+	case "hard", "":
+		err = os.Link(d.File, file)
+	case "soft", "sym", "symbolic":
+		err = os.Symlink(d.File, file)
+	// case "copy":
+	default:
+		return fmt.Errorf("%s: unsupported link type", d.Link)
+	}
 	if errors.Is(err, os.ErrExist) {
 		err = nil
 	}
@@ -296,6 +305,7 @@ type Data struct {
 
 	Mimes    MimeSet `toml:"mimetype"`
 	TimeFunc `toml:"timefunc"`
+	Link     string
 
 	Parameters []Parameter `toml:"metadata"`
 	Links      []Link      `toml:"links"`
