@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -36,9 +37,10 @@ var (
 )
 
 type Cmd struct {
-	Path string
-	File string
-	Args []string
+	Path   string
+	File   string
+	Args   []string
+	Silent bool
 
 	Pre  []Cmd `toml:"pre"`
 	Post []Cmd `toml:"post"`
@@ -57,8 +59,13 @@ func (c Cmd) Exec() error {
 func (c Cmd) Run() error {
 	args := append(c.Args, c.File)
 	cmd := exec.Command(c.Path, args...)
-	cmd.Stdout = Out
-	cmd.Stderr = Err
+	if !c.Silent {
+		cmd.Stdout = Out
+		cmd.Stderr = Err
+	} else {
+		cmd.Stdout = ioutil.Discard
+		cmd.Stderr = ioutil.Discard
+	}
 
 	return cmd.Run()
 }

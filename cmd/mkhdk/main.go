@@ -54,15 +54,20 @@ func main() {
 	}
 }
 
+const (
+	ExtXml = ".xml"
+	ExtBad = ".bad"
+)
+
 func collectData(skipbad bool) prospect.RunFunc {
-	return func (b prospect.Builder, d prospect.Data) {
+	return func(b prospect.Builder, d prospect.Data) {
 		tracer := trace.New("mkhdk")
 		defer tracer.Summarize()
 		filepath.Walk(d.File, func(file string, i os.FileInfo, err error) error {
 			if err != nil || i.IsDir() {
 				return err
 			}
-			if filepath.Ext(file) == ".xml" {
+			if ext := filepath.Ext(file); ext == ExtXml || (skipbad && ext == ExtBad) {
 				return nil
 			}
 			dat := d.Clone()
@@ -82,7 +87,6 @@ func collectData(skipbad bool) prospect.RunFunc {
 		})
 	}
 }
-
 
 const (
 	fileChannel  = "hpkt.vmu2.hci"
