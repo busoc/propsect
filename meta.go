@@ -274,12 +274,12 @@ func (c Context) Update(d Data) Data {
 		}
 	}
 
-	if d.AcqTime.IsZero() {
-		d.AcqTime = c.AcqTime
-	}
-	if d.ModTime.IsZero() {
-		d.ModTime = c.ModTime
-	}
+	// if d.AcqTime.IsZero() {
+	// 	d.AcqTime = c.AcqTime
+	// }
+	// if d.ModTime.IsZero() {
+	// 	d.ModTime = c.ModTime
+	// }
 
 	d.Parameters = append(d.Parameters, c.Metadata...)
 	return d

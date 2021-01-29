@@ -105,9 +105,18 @@ func Load(file string) (Builder, error) {
 	}
 	if r, err := os.Open(b.Include); err == nil {
 		defer r.Close()
-		if err := toml.Decode(r, &b.Context); err != nil {
+		c := struct {
+			Archive
+			Context
+		}{
+			Archive: b.Archive,
+			Context: b.Context,
+		}
+		if err := toml.Decode(r, &c); err != nil {
 			return b, err
 		}
+		b.Archive = c.Archive
+		b.Context = c.Context
 	}
 	return b, nil
 }
