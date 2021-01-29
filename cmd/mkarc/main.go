@@ -36,11 +36,17 @@ var (
 	Err = Writer(os.Stderr)
 )
 
+type Variable struct {
+	Name  string
+	Value string
+}
+
 type Cmd struct {
 	Path   string
 	File   string
 	Args   []string
 	Silent bool
+	Env    []Variable
 
 	Pre  []Cmd `toml:"pre"`
 	Post []Cmd `toml:"post"`
@@ -57,8 +63,14 @@ func (c Cmd) Exec() error {
 }
 
 func (c Cmd) Run() error {
-	args := append(c.Args, c.File)
-	cmd := exec.Command(c.Path, args...)
+	var (
+		args = append(c.Args, c.File)
+		cmd  = exec.Command(c.Path, args...)
+	)
+	for i := range c.Env {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s"), c.Env[i].Name, c.Env[i].Value)
+	}
+
 	if !c.Silent {
 		cmd.Stdout = Out
 		cmd.Stderr = Err
@@ -87,6 +99,7 @@ func main() {
 	c := struct {
 		Task     int64 `toml:"parallel"`
 		Commands []Cmd `toml:"command"`
+		Env      []Variable
 	}{}
 	if err := toml.DecodeFile(flag.Arg(0), &c); err != nil {
 		fmt.Fprintln(os.Stderr, err)
