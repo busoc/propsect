@@ -268,15 +268,20 @@ func (c Context) Update(d Data) Data {
 
 func (c Context) update(d Data) Data {
 	if !d.AcqTime.IsZero() && len(d.Increments) == 0 && len(c.Increments) > 0 {
-		sort.Slice(c.Increments, func(i, j int) bool {
-			return c.Increments[i].Starts.Before(c.Increments[j].Starts)
-		})
-		x := sort.Search(len(c.Increments), func(i int) bool {
-			return c.Increments[i].Contains(d.AcqTime)
-		})
-		if x < len(c.Increments) && c.Increments[x].Contains(d.AcqTime) {
-			d.Increments = append(d.Increments, c.Increments[x].Num)
+		// sort.Slice(c.Increments, func(i, j int) bool {
+		// 	return c.Increments[i].Starts.Before(c.Increments[j].Starts)
+		// })
+		for _, i := range c.Increments {
+			if i.Starts.Before(d.AcqTime) && i.Ends.After(d.AcqTime) {
+				d.Increments = append(d.Increments, i.Num)
+			}
 		}
+		// x := sort.Search(len(c.Increments), func(i int) bool {
+		// 	return c.Increments[i].Contains(d.AcqTime)
+		// })
+		// if x < len(c.Increments) && c.Increments[x].Contains(d.AcqTime) {
+		// 	d.Increments = append(d.Increments, c.Increments[x].Num)
+		// }
 	}
 	return d
 }
