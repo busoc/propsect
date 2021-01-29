@@ -64,6 +64,16 @@ func Build(file string, run RunFunc, accept AcceptFunc) error {
 	return nil
 }
 
+func (b Builder) Store(d Data) error {
+	d = b.Context.update(d)
+	return b.Archive.Store(d)
+}
+
+func (b Builder) CreateFile(d Data, buf []byte) (Link, error) {
+	d = b.Context.update(d)
+	return b.Archive.CreateFile(d, buf)
+}
+
 func (b Builder) GetMime(d Data) Data {
 	m := b.Mimes.Get(filepath.Ext(d.File))
 	if m.isZero() {

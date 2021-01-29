@@ -262,6 +262,11 @@ func (c Context) Update(d Data) Data {
 	if d.Owner == "" {
 		d.Owner = c.Owner
 	}
+	d.Parameters = append(d.Parameters, c.Metadata...)
+	return c.update(d)
+}
+
+func (c Context) update(d Data) Data {
 	if !d.AcqTime.IsZero() && len(d.Increments) == 0 && len(c.Increments) > 0 {
 		sort.Slice(c.Increments, func(i, j int) bool {
 			return c.Increments[i].Starts.Before(c.Increments[j].Starts)
@@ -273,15 +278,6 @@ func (c Context) Update(d Data) Data {
 			d.Increments = append(d.Increments, c.Increments[x].Num)
 		}
 	}
-
-	// if d.AcqTime.IsZero() {
-	// 	d.AcqTime = c.AcqTime
-	// }
-	// if d.ModTime.IsZero() {
-	// 	d.ModTime = c.ModTime
-	// }
-
-	d.Parameters = append(d.Parameters, c.Metadata...)
 	return d
 }
 
