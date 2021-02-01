@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+  "io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -26,8 +27,28 @@ var (
 	tableExp = regexp.MustCompile(tablePattern)
 )
 
+type List struct {
+  Records []string
+}
+
+func (i *List) Set(str string) error {
+  r, err := os.Open(str)
+  if err != nil {
+    return err
+  }
+  defer r.Close()
+
+  i.Records = readList(r)
+  return nil
+}
+
+func (i *List) String() string {
+  return "list of records"
+}
+
 func main() {
-	list := flag.String("list", "", "list of filename to keep")
+  var list List
+	flag.Var(&list, "list", "list of filename to keep")
 	flag.Parse()
 
 	accept := func(d prospect.Data) bool {
@@ -40,39 +61,14 @@ func main() {
 		}
 		return strings.ToLower(mt.Params["type"]) == "icn"
 	}
-	err := prospect.Build(flag.Arg(0), collectData(*list), accept)
+	err := prospect.Build(flag.Arg(0), collectData(list.Records), accept)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func readList(file string) []string {
-	r, err := os.Open(file)
-	if err != nil {
-		return nil
-	}
-	defer r.Close()
-
-	var (
-		list []string
-		seen = make(map[string]struct{})
-		scan = bufio.NewScanner(r)
-	)
-	for scan.Scan() {
-		line := scan.Text()
-		if _, ok := seen[line]; ok {
-			continue
-		}
-		seen[line] = struct{}{}
-		list = append(list, strings.TrimSpace(line))
-	}
-	sort.Strings(list)
-	return list
-}
-
-func collectData(file string) prospect.RunFunc {
-	list := readList(file)
+func collectData(list []string) prospect.RunFunc {
 	return func(b prospect.Builder, d prospect.Data) {
 		tracer := trace.New("mkicn")
 		defer tracer.Summarize()
@@ -82,18 +78,21 @@ func collectData(file string) prospect.RunFunc {
 				return err
 			}
 			tracer.Start(file)
+      defer tracer.Done(file, dat)
+
 			dat, files, err := processConsoleNote(d.Clone(), file, list)
 			if err != nil {
 				tracer.Error(file, err)
 				return nil
 			}
 			links := storeTables(b, files, prospect.CreateLinkFrom(dat))
+      if len(links) == 0 {
+        return nil
+      }
 			dat.Links = append(dat.Links, links...)
 			if err := b.Store(dat); err != nil {
 				tracer.Error(file, err)
-				return nil
 			}
-			tracer.Done(file, dat)
 			return nil
 		})
 	}
@@ -250,4 +249,22 @@ func parseFilename(file string) time.Time {
 
 	when, _ := time.Parse("GMT002/2006", fmt.Sprintf("%s/%s", doy, year))
 	return when
+}
+
+func readList(r io.Reader) []string {
+	var (
+		list []string
+		seen = make(map[string]struct{})
+		scan = bufio.NewScanner(r)
+	)
+	for scan.Scan() {
+		line := scan.Text()
+		if _, ok := seen[line]; ok {
+			continue
+		}
+		seen[line] = struct{}{}
+		list = append(list, strings.TrimSpace(line))
+	}
+	sort.Strings(list)
+	return list
 }
