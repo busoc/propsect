@@ -74,7 +74,7 @@ func collectData(skipbad bool) prospect.RunFunc {
 
 			tracer.Start(file)
 			defer tracer.Done(file, dat)
-			
+
 			dat, err = processData(dat, file)
 			if err != nil {
 				tracer.Error(file, err)

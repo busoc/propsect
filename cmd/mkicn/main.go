@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-  "io"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -28,26 +28,26 @@ var (
 )
 
 type List struct {
-  Records []string
+	Records []string
 }
 
 func (i *List) Set(str string) error {
-  r, err := os.Open(str)
-  if err != nil {
-    return err
-  }
-  defer r.Close()
+	r, err := os.Open(str)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
 
-  i.Records = readList(r)
-  return nil
+	i.Records = readList(r)
+	return nil
 }
 
 func (i *List) String() string {
-  return "list of records"
+	return "list of records"
 }
 
 func main() {
-  var list List
+	var list List
 	flag.Var(&list, "list", "list of filename to keep")
 	flag.Parse()
 
@@ -78,7 +78,7 @@ func collectData(list []string) prospect.RunFunc {
 				return err
 			}
 			tracer.Start(file)
-      defer tracer.Done(file, dat)
+			defer tracer.Done(file, dat)
 
 			dat, files, err := processConsoleNote(d.Clone(), file, list)
 			if err != nil {
@@ -86,9 +86,9 @@ func collectData(list []string) prospect.RunFunc {
 				return nil
 			}
 			links := storeTables(b, files, prospect.CreateLinkFrom(dat))
-      if len(links) == 0 {
-        return nil
-      }
+			if len(links) == 0 {
+				return nil
+			}
 			dat.Links = append(dat.Links, links...)
 			if err := b.Store(dat); err != nil {
 				tracer.Error(file, err)

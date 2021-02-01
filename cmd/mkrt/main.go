@@ -66,7 +66,7 @@ func collectData(b prospect.Builder, d prospect.Data) {
 
 		tracer.Start(file)
 		defer tracer.Done(file, dat)
-		
+
 		dat, err = processData(dat, file, buffer)
 		if err != nil {
 			tracer.Error(file, err)
