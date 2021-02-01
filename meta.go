@@ -28,11 +28,13 @@ const (
 	MimeCsv   = "text/csv"
 	MimeGz    = "application/gzip"
 
-	TypeCommand = "command output"
-	TypeImage   = "image"
-	TypeVideo   = "video"
-	TypeText    = "text"
-	TypeData    = "data"
+	TypeCommand    = "command output"
+	TypeImage      = "image"
+	TypeVideo      = "video"
+	TypeText       = "text"
+	TypeData       = "data"
+	TypeICN        = "inter console note"
+	TypeParamTable = "parameters table"
 
 	TypePTH = "Medium Rate Telemetry"
 	TypePDH = "Processed Data"
@@ -53,6 +55,8 @@ const (
 
 	ImageWidth  = "image.width"
 	ImageHeight = "image.height"
+
+	ScienceRun = "science.run"
 )
 
 type MimeSet []Mime
