@@ -73,6 +73,8 @@ func collectData(skipbad bool) prospect.RunFunc {
 			dat := d.Clone()
 
 			tracer.Start(file)
+			defer tracer.Done(file, dat)
+
 			dat, err = processData(dat, file)
 			if err != nil {
 				tracer.Error(file, err)
@@ -80,9 +82,7 @@ func collectData(skipbad bool) prospect.RunFunc {
 			}
 			if err := b.Store(dat); err != nil {
 				tracer.Error(file, err)
-				return nil
 			}
-			tracer.Done(file, dat)
 			return nil
 		})
 	}
