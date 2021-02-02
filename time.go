@@ -5,8 +5,48 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"strconv"
 	"time"
 )
+
+func FormatDurationISO(d time.Duration) string {
+	var (
+		sdt = uint64(d.Seconds())
+		sec uint64
+		min uint64
+		hour uint64
+		day uint64
+	)
+
+	sec = sdt%60
+	sdt /= 60
+	min = sdt%60
+	sdt /= 60
+	hour = sdt % 24
+	day /= 24
+
+	str := []byte("P")
+	if day > 0 {
+		str = strconv.AppendUint(str, day, 10)
+		str = append(str, 'D')
+	}
+	if hour > 0 || min > 0 || sec > 0 {
+		str = append(str, 'T')
+	}
+	if hour > 0 {
+		str = strconv.AppendUint(str, hour, 10)
+		str = append(str, 'H')
+	}
+	if min > 0 {
+		str = strconv.AppendUint(str, min, 10)
+		str = append(str, 'M')
+	}
+	if sec > 0 {
+		str = strconv.AppendUint(str, sec, 10)
+		str = append(str, 'S')
+	}
+	return string(str)
+}
 
 const (
 	TimeFormatRT       = "rt"

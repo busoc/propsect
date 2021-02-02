@@ -102,6 +102,9 @@ type Parameter struct {
 }
 
 func MakeParameter(k string, v interface{}) Parameter {
+	if d, ok := v.(time.Duration); ok {
+		v = FormatDurationISO(d)
+	}
 	p := Parameter{
 		Name:  k,
 		Value: fmt.Sprintf("%v", v),

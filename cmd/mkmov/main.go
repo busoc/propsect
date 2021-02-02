@@ -33,10 +33,11 @@ func collectData(b prospect.Builder, d prospect.Data) {
 		if err != nil || i.IsDir() || !d.Accept(file) {
 			return err
 		}
+		dat := d.Clone()
+		
 		tracer.Start(file)
 		defer tracer.Done(file, dat)
 
-		dat := d.Clone()
 		if dat, err = processData(dat, file); err != nil {
 			tracer.Error(file, err)
 			return nil
