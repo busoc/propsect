@@ -92,7 +92,7 @@ func collectData(list []string) prospect.RunFunc {
 			if err := b.Store(dat); err != nil {
 				tracer.Error(file, err)
 			}
-      tracer.Done(file, dat)
+			tracer.Done(file, dat)
 			return nil
 		})
 	}

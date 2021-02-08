@@ -34,9 +34,8 @@ func collectData(b prospect.Builder, d prospect.Data) {
 			return err
 		}
 		dat := d.Clone()
-		
+
 		tracer.Start(file)
-		defer tracer.Done(file, dat)
 
 		if dat, err = processData(dat, file); err != nil {
 			tracer.Error(file, err)
@@ -51,6 +50,7 @@ func collectData(b prospect.Builder, d prospect.Data) {
 		if err := b.Store(dat); err != nil {
 			tracer.Error(file, err)
 		}
+		tracer.Done(file, dat)
 		return nil
 	})
 }

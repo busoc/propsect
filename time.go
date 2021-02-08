@@ -4,26 +4,26 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 )
 
 func FormatDurationISO(d time.Duration) string {
 	var (
-		sdt = uint64(d.Seconds())
-		sec uint64
-		min uint64
+		sdt  = uint64(d.Seconds())
+		sec  uint64
+		min  uint64
 		hour uint64
-		day uint64
+		day  uint64
 	)
 
-	sec = sdt%60
+	sec = sdt % 60
 	sdt /= 60
-	min = sdt%60
+	min = sdt % 60
 	sdt /= 60
 	hour = sdt % 24
-	day /= 24
+	day = sdt / 24
 
 	str := []byte("P")
 	if day > 0 {

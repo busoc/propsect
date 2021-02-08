@@ -64,7 +64,7 @@ func (c Command) Exec(d Data) (Data, []byte, error) {
 	if c.Version != "" {
 		cmd = exec.Command(c.Path, c.Version)
 		if buf, err := cmd.Output(); err == nil && len(buf) > 0 {
-			d.Register(CmdVersion, string(buf))
+			d.Register(CmdVersion, string(bytes.Trim(buf, "\r\n")))
 		}
 	}
 	return d, buf.Bytes(), nil

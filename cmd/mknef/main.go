@@ -44,7 +44,6 @@ func collectData(b prospect.Builder, d prospect.Data) {
 		dat := d.Clone()
 
 		tracer.Start(file)
-		defer tracer.Done(file, dat)
 
 		if dat, err = processData(dat, file); err != nil {
 			tracer.Error(file, err)
@@ -65,15 +64,15 @@ func collectData(b prospect.Builder, d prospect.Data) {
 		d.ModTime = dat.ModTime
 		d.Links = append(d.Links, prospect.CreateLinkFrom(dat))
 		extractImages(file, func(base string, f *nef.File) error {
-			d := dat.Clone()
-			buf, err := updateDataFromImage(f, &d)
+			n := d.Clone()
+			buf, err := updateDataFromImage(f, &n)
 			if err != nil {
 				tracer.Error(file, err)
 				return err
 			}
-			k, err := b.CreateFile(d, buf)
+			k, err := b.CreateFile(n, buf)
 			if err == nil {
-				k.Role = d.Type
+				k.Role = n.Type
 				dat.Links = append(dat.Links, k)
 			}
 			return err
@@ -81,6 +80,7 @@ func collectData(b prospect.Builder, d prospect.Data) {
 		if err := b.Store(dat); err != nil {
 			tracer.Error(file, err)
 		}
+		tracer.Done(file, dat)
 		return nil
 	})
 }
