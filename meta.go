@@ -374,6 +374,18 @@ func (d Data) Clone() Data {
 	return x
 }
 
+func (d *Data) ClearLinks() {
+	if len(d.Links) > 0 {
+		d.Links = d.Links[:0]
+	}
+}
+
+func (d *Data) ClearParameters() {
+	if len(d.Parameters) > 0 {
+		d.Parameters = d.Parameters[:0]
+	}
+}
+
 func (d *Data) Register(name string, value interface{}) {
 	if name == "" || value == nil {
 		return

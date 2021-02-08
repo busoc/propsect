@@ -62,14 +62,16 @@ func collectData(b prospect.Builder, d prospect.Data) {
 
 		d.AcqTime = dat.AcqTime
 		d.ModTime = dat.ModTime
-		d.Links = append(d.Links, prospect.CreateLinkFrom(dat))
+		// d.Links = append(d.Links, prospect.CreateLinkFrom(dat))
 		extractImages(file, func(base string, f *nef.File) error {
-			n := d.Clone()
+			n := dat.Clone()
+			n.ClearLinks()
 			buf, err := updateDataFromImage(f, &n)
 			if err != nil {
 				tracer.Error(file, err)
 				return err
 			}
+			n.Links = append(n.Links, prospect.CreateLinkFrom(dat))
 			k, err := b.CreateFile(n, buf)
 			if err == nil {
 				k.Role = n.Type
