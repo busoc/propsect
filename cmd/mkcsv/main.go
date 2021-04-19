@@ -16,7 +16,7 @@ import (
 const (
 	MainType   = "text"
 	SubType    = "csv"
-	fileHeader = "file.%d.header"
+	fileHeader = "csv.%d.header"
 )
 
 const TimePattern = "2006-01-02T15:04:05.000"
