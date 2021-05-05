@@ -17,6 +17,9 @@ func FormatDurationISO(d time.Duration) string {
 		hour uint64
 		day  uint64
 	)
+	if d.Seconds() == 0 {
+		return "P0S"
+	}
 
 	sec = sdt % 60
 	sdt /= 60

@@ -1,24 +1,24 @@
 package main
 
 import (
-  "flag"
-  "fmt"
-  "path/filepath"
-  "os"
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
 
-  "github.com/busoc/prospect"
-  "github.com/busoc/prospect/cmd/internal/trace"
-  "github.com/midbel/mime"
-  "github.com/midbel/pdf"
+	"github.com/busoc/prospect"
+	"github.com/busoc/prospect/cmd/internal/trace"
+	"github.com/midbel/mime"
+	"github.com/midbel/pdf"
 )
 
 const (
-	MainType   = "application"
-	SubType    = "pdf"
-  fileAuthor = "file.author"
-  fileSubject = "file.subject"
-  fileTitle = "file.title"
-  fileKeyword = "file.%d.keyword"
+	MainType    = "application"
+	SubType     = "pdf"
+	fileAuthor  = "file.author"
+	fileSubject = "file.subject"
+	fileTitle   = "file.title"
+	fileKeyword = "file.%d.keyword"
 )
 
 func main() {
@@ -69,21 +69,21 @@ func processData(d prospect.Data, file string) (prospect.Data, error) {
 }
 
 func readFile(d prospect.Data) (prospect.Data, error) {
-  doc, err := pdf.Open(d.File)
-  if err != nil {
-    return d, err
-  }
-  defer doc.Close()
+	doc, err := pdf.Open(d.File)
+	if err != nil {
+		return d, err
+	}
+	defer doc.Close()
 
-  info := doc.GetDocumentInfo()
-  d.AcqTime = info.Created
-  d.ModTime = info.Modified
+	info := doc.GetDocumentInfo()
+	d.AcqTime = info.Created
+	d.ModTime = info.Modified
 
-  d.Register(fileTitle, info.Title)
-  d.Register(fileSubject, info.Subject)
-  d.Register(fileAuthor, info.Author)
-  for i := range info.Keywords {
-    d.Register(fmt.Sprintf(fileKeyword, i), info.Keywords[i])
-  }
-  return d, nil
+	d.Register(fileTitle, info.Title)
+	d.Register(fileSubject, info.Subject)
+	d.Register(fileAuthor, info.Author)
+	for i := range info.Keywords {
+		d.Register(fmt.Sprintf(fileKeyword, i), info.Keywords[i])
+	}
+	return d, nil
 }
