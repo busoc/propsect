@@ -21,7 +21,7 @@ const (
 	scienceRec = "scienceRun.%d.numrec"
 )
 
-const TimePattern = "2006.002.15.04.05.000000"
+const TimePattern = "2006-01-02T15:04:05.000000"
 
 func main() {
 	flag.Parse()
