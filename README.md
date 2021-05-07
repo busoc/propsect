@@ -170,6 +170,7 @@ pattern3 = archive/FlightModel/ScienceRun/calibrated/json/2021/05/07
   * metadata
   * increment
 * group set of related products into the same configuration file (set kind of products that will be processed by two differents commands or by the same command). Use the include option to extract common options as described in the bullet above
+* use mkarc with your multiple configuration files in order to ease your life
 * be consistant in the name of the data type that you use in the configuration file. It should be the same as the one given in the Blank Book.
 
 ## configuration for mdexp command
