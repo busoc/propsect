@@ -66,7 +66,7 @@ archive = "{source}/{level}/{type}/{year}/{doy}/{hour}/{min}"
 * **file**: a list of file/directory where data files will be extracted and their metadata generated before being stored into the final archive
   * **experiment** (string): name of an experiment. if empty, the one of the main section will be used
   * **file** (string): path to a file or directory where data files should be added to the archive
-  * **mime** (string): mime type describing the file format of the products in a given location. Most of the command will use this string in order to accept or reject files to be processed.
+  * **mime** (string): mime type describing the file format of the product(s) in a given location. Most of the command will use this string in order to determine if they have to discard the section or if they have to process the files of the current section.
   * **type** (string): type of products found in the given location (productType)
   * **level** (int): level of processing of the files (default to 0)
   * **acqtime** (date/datetime): default acquisition time to used if no acquisition time can be extracted from their content
@@ -76,7 +76,7 @@ archive = "{source}/{level}/{type}/{year}/{doy}/{hour}/{min}"
   * **increments** (list of string): list of increment(s) during which the increment take place.
   * **archive** (string): a pattern that will describe the final location of a data file and its related metadata into the archive. See below for the syntax of the pattern.
   * **extensions** (list of string): list of file extensions that a command will look for in order to accept or reject the file. If a file has an extension that does not appears in the list, a command can discard the file and not process it. If the list is empty, all the files will be accepted.
-  * **timefunc** (string): the name of function that will be used by the commands to extract the acqtime/modtime of a data file. See below for a list of supported values.
+  * **timefunc** (string): the name of function that will be used by the commands to extract the acqtime/modtime of a data file. See below for a list of supported values. If the timefunc function is not set, it will be the responsability of the commands (when they can) to guess the best acquisition and modification time.
   * **mimetype**: a list of mimetype that are acceptable for a specific kind of file
     * **extensions** (list of string): list of accepted extensions
     * **mime** (string): mime type that describes the file format of the products in a given location
@@ -277,6 +277,8 @@ mkcsv expects the following points for each input files:
 * the first line contains the headers
 * the first column contains time information in the form of yyyy-mm-ddTHH:MM:SS.xxx
 
+this command use the time value of the first row (after the headers) to set the acquisition time and the time value of the last row to set the modification time.
+
 this command add the following specific metadata:
 
 * file.numrec
@@ -298,7 +300,7 @@ extensions = [".csv", ".gz", ".csv.gz"]
 
 ### mkfile
 
-the mkfile can be used for any type of files.
+the mkfile can be used for any type of files. It use the information given in its "file" section to set all the propreties in the metadata
 
 a sample configuration for the mkfile command
 
@@ -306,6 +308,8 @@ a sample configuration for the mkfile command
 file       = "Calibrated/Commands"
 mime       = "application/json"
 type       = "commands history logs"
+acqtime    = 2021-05-07T08:26:00
+modtime    = 2021-05-07T11:26:00
 level      = 1
 timefunc   = "year.doy"
 archive    = "{source}/{level}/{type}/{year}"
@@ -315,6 +319,13 @@ extensions = [".json", ".gz", ".json.gz"]
 ### mkhdk
 
 the mkhdk command can process all files available in the hadock archive.
+
+to know if the command should processed a given file section in the config file, the mkhdk command checks the mime option for the following information:
+
+* level option is set to 1 and the mime type equal to image/png or image/jpeg
+* mime type is set to application/octet-stream and type parameter is set to hpkt-vmu2 and the subtype parameter is set to image or science
+
+the acquisition time is taken from the time string available in the filename. The modification is set to the acquisition time.
 
 the mkhdk command adds the following metadata:
 
@@ -338,9 +349,57 @@ the mkhdk command adds the following metadata:
 * hpkt.vmu2.scale.far
 * scienceRun
 
+example
+
+```toml
+[[file]]
+file    = "LineCamera/Calibrated"
+mime    = "image/png"
+type    = "line camera image"
+level   = 1
+archive = "{source}/{level}/{type}/{year}/{doy}/{hour}/{min}"
+
+[[file]]
+file    = "OverviewCamera/Raw"
+mime    = "application/octet-stream;type=hpkt-vmu2,subtype=image"
+type    = "overview camera image"
+level   = 0
+archive = "{source}/{level}/{type}/{year}/{doy}/{hour}/{min}"
+
+[[file]]
+file    = "SyncUnit/Raw"
+mime    = "application/octet-stream;type=hpkt-vmu2,subtype=science"
+type    = "smd sync unit"
+level   = 0
+archive = "{source}/{level}/{type}/{year}/{doy}/{hour}/{min}"
+```
+
+the mkhdk accepts one option: -skip-bad. All files in the hadock archive with .bad extension will be discarded.
+
 ### mkicn
 
-the mkicn process Inter-Console Note file and their related "data files"
+the mkicn process Inter-Console Note file and their related "data files". In one run, the mkicn will search for files having the .icn extension and foreach entry found in the ICN will read the file specified and includes it into the archive.
+
+The mkicn will only process file section having the mime option set to "text/plain;type=icn". Additional parameters are allowed.
+
+The acquisition time of the file is taken from the uplink time available in the heading of the inter console note.
+
+The mkicn adds the following metadata:
+
+* ptr.%d.href: path to a related file
+* ptr.%d.role: role of a related file (inter console note, parameters table)
+
+example
+
+```toml
+[[file]]
+file       = "ICN"
+mime       = "text/plain;type=icn,access=sequential,form=block-formatted"
+type       = "inter console note"
+extensions = [".icn", ".ICN"]
+level      = 1
+archive    = "{source}/{level}/{type}/{year}"
+```
 
 ### mkmma
 
@@ -353,6 +412,19 @@ the mkmma command adds the following metadata:
 * csv.%d.header
 * scienceRun.%d
 * scienceRun.%d.numrec
+
+example
+
+```toml
+[[file]]
+file       = "MMA/Calibrated"
+type       = "MMA"
+mime       = "text/csv;delimiter=comma"
+level      = 1
+timefunc   = "year.doy"
+archive    = "{source}/{level}/{type}/{year}"
+extensions = [".csv", ".gz", ".csv.gz"]
+```
 
 ### mkmov
 
