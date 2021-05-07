@@ -82,6 +82,12 @@ result.
 only the mkfile command can be used for any type of products because it does not try to go further
 in the content of the product.
 
+All commands by default will add the following specific metadata:
+
+* file.size
+* file.md5
+* file.encoding: set to application/gzip if the file is compressed (extension ends with .gz)
+
 ### mkarc
 
 the mkarc command is not linked to any products. It's main goal is to have one command
@@ -149,21 +155,142 @@ file = "etc/prospect/exp/dump.toml"
 
 ### mkcsv
 
+the mkcsv command is specialized in the processing of CSV file only.
+
+the mkcsv command only process files from a file section if the mime option is set
+to **text/csv**. Moreover, additional parameters can be added to the mimetype string
+to help the command to detect the correct delimiter.
+
+eg: `text/csv;delimiter=tab`
+
+the recognized values for the delimiter option are:
+
+* tab
+* comma (default if delimiter option is not specifier)
+* space
+* pipe
+* colon
+* semicolon
+
+mkcsv expects the following points for each input files:
+
+* the first line contains the headers
+* the first column contains time information in the form of yyyy-mm-ddTHH:MM:SS.xxx
+
+this command add the following specific metadata:
+
+* file.numrec
+* file.duration ([in ISO format](https://en.wikipedia.org/wiki/ISO_8601#Durations))
+* csv.%d.header
+
+a sample configuration for csv file:
+
+```toml
+[[file]]
+file       = "Calibrated/Dump"
+type       = "parameter dump"
+mime       = "text/csv;delimiter=tab"
+level      = 1
+timefunc   = "year.doy"
+archive    = "{source}/{level}/{type}/{year}"
+extensions = [".csv", ".gz", ".csv.gz"]
+```
+
 ### mkfile
+
+the mkfile can be used for any type of files.
+
+a sample configuration for the mkfile command
+
+```toml
+file       = "Calibrated/Commands"
+mime       = "application/json"
+type       = "commands history logs"
+level      = 1
+timefunc   = "year.doy"
+archive    = "{source}/{level}/{type}/{year}"
+extensions = [".json", ".gz", ".json.gz"]
+```
 
 ### mkhdk
 
+the mkhdk command can process all files available in the hadock archive.
+
+the mkhdk command adds the following metadata:
+
+* hpkt.vmu2.hci
+* hpkt.vmu2.origin
+* hpkt.vmu2.source
+* hpkt.vmu2.upi
+* hpkt.vmu2.instance
+* hpkt.vmu2.mode
+* hpkt.vmu2.fmt
+* hpkt.vmu2.pixels.x
+* hpkt.vmu2.pixels.y
+* hpkt.vmu2.invalid
+* hpkt.vmu2.roi.xof
+* hpkt.vmu2.roi.xsz
+* hpkt.vmu2.roi.yof
+* hpkt.vmu2.roi.ysz
+* hpkt.vmu2.fdrp
+* hpkt.vmu2.scale.xsz
+* hpkt.vmu2.scale.ysz
+* hpkt.vmu2.scale.far
+* scienceRun
+
 ### mkicn
+
+the mkicn process Inter-Console Note file and their related "data files"
 
 ### mkmma
 
+the mkmma command is like the mkcsv command but only for csv files with MMA data inside.
+
+the mkmma command adds the following metadata:
+
+* file.numrec
+* file.duration ([in ISO format](https://en.wikipedia.org/wiki/ISO_8601#Durations))
+* csv.%d.header
+* scienceRun.%d
+* scienceRun.%d.numrec
+
 ### mkmov
+
+the mkmov command can be used to process MOV file (quicktime format)
+
+the mkmov command adds the following metadata:
+
+* file.duration ([in ISO format](https://en.wikipedia.org/wiki/ISO_8601#Durations))
 
 ### mknef
 
+the mknef command can be used to process images in the NEF format (Nikon Electronic file -
+ a kind of tiff file with specific information from Nikon devices).
+
+the mkmma command adds the following metadata:
+
+* file.width
+* file.height
+
 ### mkpdf
 
+the mkpdf can be used for PDF files.
+
+the mkpdf command adds the following metadata:
+
+* file.author
+* file.subject
+* file.title
+* file.%d.keyword
+
 ### mkrt
+
+the mkrt command has been written to process RT files available in the HRDP archive.
+
+the mkrt command adds the following metadata:
+
+* file.numrec
+* file.duration ([in ISO format](https://en.wikipedia.org/wiki/ISO_8601#Durations))
 
 ### mdexp
 
