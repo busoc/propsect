@@ -49,13 +49,14 @@ archive = "{source}/{level}/{type}/{year}/{doy}/{hour}/{min}"
 * **datadir** (string): path to the directory where the data files will be stored. See also the link option of the **file** section.
 * **metadir** (string): path to the directory where the metadata file will be stored.
 * **experiment** (string): name of an experiment
-* **model** (string):
-* **source** (string):
+* **model** (string): model that has generated the data that will be stored into the archives (flight model, ground model,...)
+* **source** (string): type of activities that has generated the data that will be stored into the archive (science run, EST, commissionning).
 * **owner** (string): owner of the data stored in the archive
-* **relative-root** (string):
+* **relative-root** (string): a string that will be added to the relativePath element of each product
 * **acqtime** (date/datetime): a default acquisition time to use for all data files if no acquisition time can be extracted from their content
 * **modtime** (date/datetime): a default modification time to use for all data files if no modification time can be extracted from their content
-* **metadata**: list of metadata object that will be added to all the data files that are registered in the file section.
+* **include** (string): path to a file that contains common values for options that can be reused for multiple file section. The included file can only contain options describe just above
+* **metadata**: list of metadata object that will be added to all the data files that are registered in the file section. This option allows to specify metadata that are commons to all data files that can be extracted from the content of the files that will be stored into the archive
   * **name** (string): the name of the metadata
   * **value** (string/bool/date/datetime/float/int): the value associated to the metadata
 * **increment**: list of increment during which an experiment take place
@@ -71,11 +72,11 @@ archive = "{source}/{level}/{type}/{year}/{doy}/{hour}/{min}"
   * **acqtime** (date/datetime): default acquisition time to used if no acquisition time can be extracted from their content
   * **modtime** (date/datetime): default modification time to used if no modification time can be extracted from their content
   * **link** (string): kind of link to create between the original data file and the file placed into the archive. Supported values are: *hard*, *sym*, *soft*, *symbolic*.
-  * **crews** (list of string): list of crews involved in the experiment.
-  * **increments** (list of string): list of increment during which the increment take place.
-  * **archive** (string):
+  * **crews** (list of string): list of crew members involved in the experiment.
+  * **increments** (list of string): list of increment(s) during which the increment take place.
+  * **archive** (string): a pattern that will describe the final location of a data file and its related metadata into the archive. See below for the syntax of the pattern.
   * **extensions** (list of string): list of file extensions that a command will look for in order to accept or reject the file. If a file has an extension that does not appears in the list, a command can discard the file and not process it. If the list is empty, all the files will be accepted.
-  * **timefunc** (string):
+  * **timefunc** (string): the name of function that will be used by the commands to extract the acqtime/modtime of a data file. See below for a list of supported values.
   * **mimetype**: a list of mimetype that are acceptable for a specific kind of file
     * **extensions** (list of string): list of accepted extensions
     * **mime** (string): mime type that describes the file format of the products in a given location
@@ -86,6 +87,62 @@ archive = "{source}/{level}/{type}/{year}/{doy}/{hour}/{min}"
   * **links**: list of links to other files in the archive
     * **file** (string): path to a file to be included in the archive and to be linked to the current file
     * **role** (string): role of the linked file regarding the current file being processed
+
+### Supported timefunc
+
+* year.doy: this function supposes that the filename contains the day of year of the acquisiton and the parent directory contains the year of acquisition of the data.
+* year.doy.hour: this function supposes that the filename contains the hour of the acquisiton, its parent directory contains the day of year of the acquisition and its grand parent directory the year of the acquisiton
+* rt: this function supposes that the acquisition time of a file can be extracted in the same way that rt files are stored into the hrdp archive: <year>/<doy>/<hour>/rt_<from>_<to>.dat
+* hadock, hdk: this function supposes that the acquisition time of a file can be extracted from a filename that has the same structure of a file found in the hadock archive
+* now: this function generates a acquisition time equal to the moment when this function is called
+
+### pattern syntax
+
+path in the archive can be configured in the following way:
+
+* element surrounded by curly braces will be replaced by their value
+* element not surrounded by curly braces are written as is in the final path
+
+the following elements will be replaced by their equivalent values in the config file:
+
+* **level**: product level
+* **source, run**: type of activities (science ru, est, commissionning,...)
+* **model**: model that has generated the data (ground model, flight model,...)
+* **mime, format**: only the sub type of the mimetype
+* **type**: data type of the product
+* **year**: year of the acquisition time (4 digits)
+* **doy**: day of year of the acquisition time (3 digits)
+* **month**: month of the acquisition time (2 digits)
+* **day**: day of the month of the acquisition time (2 digits)
+* **hour**: hour of the day of the acquisition time (2 digits)
+* **min, minute**: minute of the acquisition time (2 digits)
+* **sec, second**: second of the acquisition time (2 digits)
+* **timestamp**: unix timestamp of the acquisition time (2 digits)
+
+some examples:
+
+```toml
+
+acqtime = 2021-05-11T11:13:20Z
+model   = "flight model"
+source  = "science run"
+mime    = "application/json"
+type    = "data"
+level   = 1
+
+pattern1 = "archive/exp/{level}/{year}/{doy}"
+pattern2 = "{source}/{mime}/{level}/{year}/{doy}/{hour}"
+pattern3 = "archive/{model}/{source}/calibrated/{mime}/{year}/{month}/{day}"
+```
+
+will produces:
+
+```bash
+pattern1 = archive/exp/1/2021/127
+pattern2 = ScienceRun/json/1/2021/127/11
+pattern3 = archive/FlightModel/ScienceRun/calibrated/json/2021/05/07
+```
+
 
 ## configuration for mdexp command
 
