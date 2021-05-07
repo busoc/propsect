@@ -151,6 +151,22 @@ pattern2 = ScienceRun/json/1/2021/127/11
 pattern3 = archive/FlightModel/ScienceRun/calibrated/json/2021/05/07
 ```
 
+## Some Tips/Advices
+
+* extract all common options in the same configuration file and include it via the include option
+  * datadir
+  * metadir
+  * experiment
+  * model
+  * source
+  * owner
+  * relative-root
+  * acqtime
+  * modtime
+  * metadata
+  * increment
+* group set of related products into the same configuration file (set kind of products that will be processed by two differents commands or by the same command). Use the include option to extract common options as described in the bullet above
+* be consistant in the name of the data type that you use in the configuration file. It should be the same as the one given in the Blank Book.
 
 ## configuration for mdexp command
 
