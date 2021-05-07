@@ -62,11 +62,11 @@ archive = "{source}/{level}/{type}/{year}/{doy}/{hour}/{min}"
   * **increment** (string): label for an increment
   * **starts** (date/datetime): start time of an increment
   * **ends** (date/datetime): end time of an increment
-* **file**:
+* **file**: a list of file/directory where data files will be extracted and their metadata generated before being stored into the final archive
   * **experiment** (string): name of an experiment. if empty, the one of the main section will be used
   * **file** (string): path to a file or directory where data files should be added to the archive
-  * **mime** (string):
-  * **type** (string):
+  * **mime** (string): mime type describing the file format of the products in a given location. Most of the command will use this string in order to accept or reject files to be processed.
+  * **type** (string): type of products found in the given location (productType)
   * **level** (int): level of processing of the files (default to 0)
   * **acqtime** (date/datetime): default acquisition time to used if no acquisition time can be extracted from their content
   * **modtime** (date/datetime): default modification time to used if no modification time can be extracted from their content
@@ -76,16 +76,16 @@ archive = "{source}/{level}/{type}/{year}/{doy}/{hour}/{min}"
   * **archive** (string):
   * **extensions** (list of string): list of file extensions that a command will look for in order to accept or reject the file. If a file has an extension that does not appears in the list, a command can discard the file and not process it. If the list is empty, all the files will be accepted.
   * **timefunc** (string):
-  * **mimetype**:
-    * **extensions** (list of string):
-    * **mime** (string):
-    * **type** (string):
+  * **mimetype**: a list of mimetype that are acceptable for a specific kind of file
+    * **extensions** (list of string): list of accepted extensions
+    * **mime** (string): mime type that describes the file format of the products in a given location
+    * **type** (string): type of product (possibly overwrite the one defined in the section above)
   * **metadata**: list of metadata object that will be added to all the files found for a specific file section. if metadata are defined in the top level object, they will be merge to this list.
     * **name** (string): name of the metadata
     * **value** (string/bool/date/datetime/float/int): value related to this metadata
-  * **links**:
-    * **file** (string):
-    * **role** (string):
+  * **links**: list of links to other files in the archive
+    * **file** (string): path to a file to be included in the archive and to be linked to the current file
+    * **role** (string): role of the linked file regarding the current file being processed
 
 ## configuration for mdexp command
 
