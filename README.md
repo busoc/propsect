@@ -104,7 +104,7 @@ archive = "{source}/{level}/{type}/{year}/{doy}/{hour}/{min}"
 
 * year.doy: this function supposes that the filename contains the day of year of the acquisiton and the parent directory contains the year of acquisition of the data.
 * year.doy.hour: this function supposes that the filename contains the hour of the acquisiton, its parent directory contains the day of year of the acquisition and its grand parent directory the year of the acquisiton
-* rt: this function supposes that the acquisition time of a file can be extracted in the same way that rt files are stored into the hrdp archive: <year>/<doy>/<hour>/rt_<from>_<to>.dat
+* rt: this function supposes that the acquisition time of a file can be extracted in the same way that rt files are stored into the hrdp archive: \<year\>/\<doy\>/\<hour\>/rt_\<from\>_\<to\>.dat
 * hadock, hdk: this function supposes that the acquisition time of a file can be extracted from a filename that has the same structure of a file found in the hadock archive
 * now: this function generates a acquisition time equal to the moment when this function is called
 
