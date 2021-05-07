@@ -132,7 +132,7 @@ silent = true
 
   [[command.pre]]
   path = "copy.sh"
-  args = ["-s" "/tmp/images", "-d", "/archives/images"]
+  args = ["-s", "/tmp/images", "-d", "/archives/images"]
 
   [[command.pre]]
   path = "hash.sh"
