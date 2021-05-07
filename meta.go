@@ -254,6 +254,8 @@ type Context struct {
 
 	Increments []Increment `toml:"increment"`
 	Metadata   []Parameter
+
+	RelativeRoot string `toml:"relative-root"`
 }
 
 func (c Context) Update(d Data) Data {
@@ -270,6 +272,7 @@ func (c Context) Update(d Data) Data {
 		d.Owner = c.Owner
 	}
 	d.Parameters = append(d.Parameters, c.Metadata...)
+	d.relativeRoot = c.RelativeRoot
 	return c.update(d)
 }
 
@@ -311,6 +314,7 @@ type Data struct {
 
 	Size int64
 	MD5  string
+	relativeRoot string
 }
 
 func ReadFile(d *Data, file string) error {
@@ -435,7 +439,12 @@ func (d Data) MarshalXML(e *xml.Encoder, s xml.StartElement) error {
 	e.EncodeElement(d.Level, startElement("processingLevel"))
 	e.EncodeElement(d.Type, startElement("productType"))
 	e.EncodeElement(d.Mime, startElement("fileFormat"))
-	e.EncodeElement(d.File, startElement("relativePath"))
+
+	relativePath := d.File
+	if d.relativeRoot != "" {
+		relativePath = filepath.Join(d.relativeRoot, relativePath)
+	}
+	e.EncodeElement(relativePath, startElement("relativePath"))
 	xs := struct {
 		Method string `xml:"method"`
 		Value  string `xml:"value"`
