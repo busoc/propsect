@@ -63,6 +63,14 @@ archive = "{source}/{level}/{type}/{year}/{doy}/{hour}/{min}"
   * **increment** (string): label for an increment
   * **starts** (date/datetime): start time of an increment
   * **ends** (date/datetime): end time of an increment
+* **command**: list of commands that can be executed for certain type of data (only available for nef and mov data products). The main purpose is to generated additional metadata that can be extracted from external tools and their results will be added as specific products
+    * **path** (string): path to the command to be executed or only the filename
+    * **version** (string): option to give to the command to retrieve version information of the command. It will be added as specific metadata to the output of the command
+    * **args** (list of string): arguments to give the command
+    * **mime** (string): mime type of the output of the command
+    * **type** (string): data type of the output of the command
+    * **ext** (string): extension to give to file resulting of the output of the command
+    * **extensions** (string):
 * **file**: a list of file/directory where data files will be extracted and their metadata generated before being stored into the final archive
   * **experiment** (string): name of an experiment. if empty, the one of the main section will be used
   * **file** (string): path to a file or directory where data files should be added to the archive
@@ -428,25 +436,83 @@ extensions = [".csv", ".gz", ".csv.gz"]
 
 ### mkmov
 
-the mkmov command can be used to process MOV file (quicktime format)
+the mkmov command can be used to process MOV file (quicktime format).
+
+The mkmov command will only process files describe in section with the mime option set to video/quicktime.
+
+The acquisition time and modification time are extracted from the metadata available in the video files.
 
 the mkmov command adds the following metadata:
 
 * file.duration ([in ISO format](https://en.wikipedia.org/wiki/ISO_8601#Durations))
+
+example
+
+```toml
+
+[[command]]
+path       = "./bin/movexplore"
+version    = "-v"
+type       = "command output"
+mime       = "text/plain"
+ext        = ".txt"
+extensions = [".mov", ".MOV"]
+
+[[file]]
+# directory where MOV files are stored
+file       = "tmp/thor"
+type       = "video"
+mime       = "video/quicktime"
+level      = 1
+crews      = ["Andreas Morgensen"]
+increments = ["49-50"]
+extensions = [".mov", ".MOV"]
+archive    = "{source}/{type}/{level}/{year}/{doy}"
+```
 
 ### mknef
 
 the mknef command can be used to process images in the NEF format (Nikon Electronic file -
  a kind of tiff file with specific information from Nikon devices).
 
+The mkmov command will only process files describe in section with the mime option set to image/x-nikon-nef
+
+ The acquisition time and modification time are extracted from the metadata available in the image files.
+
 the mkmma command adds the following metadata:
 
 * file.width
 * file.height
 
+example
+
+```toml
+[[command]]
+path       = "./bin/nefex"
+type       = "command output"
+mime       = "text/plain"
+ext        = ".txt"
+extensions = [".nef", ".NEF"]
+
+[[file]]
+# directory where NEF files are stored
+file       = "tmp/thor"
+type       = "image"
+mime       = "image/x-nikon-nef"
+level      = 0
+increments = ["49-50"]
+crews      = ["Andreas Morgensen"]
+extensions = [".nef", ".NEF"]
+archive    = "{source}/{type}/{level}/{year}/{doy}"
+```
+
 ### mkpdf
 
 the mkpdf can be used for PDF files.
+
+The mkmov command will only process files describe in section with the mime option set to application/pdf.
+
+The acquisition and modification times are extracted from the metadata available in the pdf document.
 
 the mkpdf command adds the following metadata:
 
@@ -455,14 +521,62 @@ the mkpdf command adds the following metadata:
 * file.title
 * file.%d.keyword
 
+example
+
+```toml
+[[file]]
+file       = "Anomalies"
+type       = "Anomalies Reports"
+mime       = "application/pdf"
+level      = 1
+archive    = "{source}/{level}/{type}/{year}"
+extensions = [".pdf"]
+```
+
 ### mkrt
 
 the mkrt command has been written to process RT files available in the HRDP archive.
+
+the mkrt command only process file section having the type option set to (case insensitive):
+
+* Medium Rate Telemetry
+* Processed Data
+* High Rate Data
+
+the acqusition and modification times are extracted from the directory where the rt files are located (tree structure similar to the one of the HRDP archive)
 
 the mkrt command adds the following metadata:
 
 * file.numrec
 * file.duration ([in ISO format](https://en.wikipedia.org/wiki/ISO_8601#Durations))
+
+example
+
+```toml
+[[file]]
+file       = "PTH"
+mime       = "application/octet-stream;access=sequential,form=unformatted,type=pth"
+type       = "medium rate telemetry"
+level      = 0
+archive    = "{source}/{level}/{type}/{year}/{doy}/{hour}"
+extensions = [".dat"]
+
+[[file]]
+file       = "PDH"
+mime       = "application/octet-stream;access=sequential,form=unformatted,type=pdh"
+type       = "processed data"
+level      = 0
+archive    = "{source}/{level}/{type}/{year}/{doy}/{hour}"
+extensions = [".dat"]
+
+[[file]]
+file       = "HRDL"
+mime       = "application/octet-stream;access=sequential,form=unformatted,type=hrd"
+type       = "high rate data"
+level      = 0
+archive    = "{source}/{level}/{type}/{year}/{doy}/{hour}"
+extensions = [".dat"]
+```
 
 ### mdexp
 
