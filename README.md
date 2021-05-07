@@ -1,5 +1,9 @@
 # prospect
 
+prospect is a library and a set of tools made to create archive of experiments that will have to be transfered to the Science Data Centre.
+
+prospect, in its library, provides a set of Type and Function to generate the metadata required by SDC. It also provides a set of commands that generates the metadata for specific type of data.
+
 ## configuration for mk\*\*\* commands
 
 see below for an example of configuration file
