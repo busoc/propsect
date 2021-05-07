@@ -312,8 +312,8 @@ type Data struct {
 	Parameters []Parameter `toml:"metadata"`
 	Links      []Link      `toml:"links"`
 
-	Size int64
-	MD5  string
+	Size         int64
+	MD5          string
 	relativeRoot string
 }
 

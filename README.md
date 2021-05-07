@@ -2,6 +2,8 @@
 
 ## configuration for mk\*\*\* commands
 
+see below for an example of configuration file
+
 ```toml
 datadir    = "/archive/demo/SDC/data"
 metadir    = "/archive/demo/SDC/metadata"
@@ -43,6 +45,47 @@ level   = 0
 archive = "{source}/{level}/{type}/{year}/{doy}/{hour}/{min}"
 
 ```
+
+* **datadir** (string): path to the directory where the data files will be stored. See also the link option of the **file** section.
+* **metadir** (string): path to the directory where the metadata file will be stored.
+* **experiment** (string): name of an experiment
+* **model** (string):
+* **source** (string):
+* **owner** (string): owner of the data stored in the archive
+* **relative-root** (string):
+* **acqtime** (date/datetime): a default acquisition time to use for all data files if no acquisition time can be extracted from their content
+* **modtime** (date/datetime): a default modification time to use for all data files if no modification time can be extracted from their content
+* **metadata**: list of metadata object that will be added to all the data files that are registered in the file section.
+  * **name** (string): the name of the metadata
+  * **value** (string/bool/date/datetime/float/int): the value associated to the metadata
+* **increment**: list of increment during which an experiment take place
+  * **increment** (string): label for an increment
+  * **starts** (date/datetime): start time of an increment
+  * **ends** (date/datetime): end time of an increment
+* **file**:
+  * **experiment** (string): name of an experiment. if empty, the one of the main section will be used
+  * **file** (string): path to a file or directory where data files should be added to the archive
+  * **mime** (string):
+  * **type** (string):
+  * **level** (int): level of processing of the files (default to 0)
+  * **acqtime** (date/datetime): default acquisition time to used if no acquisition time can be extracted from their content
+  * **modtime** (date/datetime): default modification time to used if no modification time can be extracted from their content
+  * **link** (string): kind of link to create between the original data file and the file placed into the archive. Supported values are: *hard*, *sym*, *soft*, *symbolic*.
+  * **crews** (list of string): list of crews involved in the experiment.
+  * **increments** (list of string): list of increment during which the increment take place.
+  * **archive** (string):
+  * **extensions** (list of string): list of file extensions that a command will look for in order to accept or reject the file. If a file has an extension that does not appears in the list, a command can discard the file and not process it. If the list is empty, all the files will be accepted.
+  * **timefunc** (string):
+  * **mimetype**:
+    * **extensions** (list of string):
+    * **mime** (string):
+    * **type** (string):
+  * **metadata**: list of metadata object that will be added to all the files found for a specific file section. if metadata are defined in the top level object, they will be merge to this list.
+    * **name** (string): name of the metadata
+    * **value** (string/bool/date/datetime/float/int): value related to this metadata
+  * **links**:
+    * **file** (string):
+    * **role** (string):
 
 ## configuration for mdexp command
 
@@ -96,17 +139,17 @@ to centralize the execution of the different mk\*\*\* commands made available by
 its only input is a configuration file (see below for an example) that have the following
 options/sections:
 
-* parallel (integer): number of commands that mkarc will run in parallel. If not given or equal to 0, mkarc will execute all the commands configured simultaneously.
+* **parallel** (integer): number of commands that mkarc will run in parallel. If not given or equal to 0, mkarc will execute all the commands configured simultaneously.
 
-* file:
-  * path (string): name or path to the command that should be executed
-  * file (string): path to the configuration file to give to the command
-  * args (list of string): list of options and their arguments to give to the command
+* **command**:
+  * **path** (string): name or path to the command that should be executed
+  * **file** (string): path to the configuration file to give to the command
+  * **args** (list of string): list of options and their arguments to give to the command
   * silent(boolean): cause mkarc to discard the output to stdout and stderr of the current
     command
-  * env (list of name:value): list of variables that mkarc should be to the environment of
+  * **env** (list of name:value): list of variables that mkarc should be to the environment of
     the executed command
-  * pre (list of command): list of commands that should be executed sequentially before the
+  * **pre** (list of command): list of commands that should be executed sequentially before the
     execution of the current command
   * post(list of command): list of commands that should be executed sequentially after the
     execution of the current command
