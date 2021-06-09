@@ -19,11 +19,15 @@ const (
 	fileHeader = "csv.%d.header"
 	scienceRun = "scienceRun.%d"
 	scienceRec = "scienceRun.%d.numrec"
+	scienceDur = "scienceRun.%d.duration"
 )
+
+const DefaultInterval = time.Microsecond * 666
 
 const TimePattern = "2006-01-02T15:04:05.000000"
 
 func main() {
+	between := flag.Duration("d", DefaultInterval, "interval of time between two lines")
 	flag.Parse()
 
 	accept := func(d prospect.Data) bool {
@@ -33,44 +37,46 @@ func main() {
 		}
 		return m.MainType == MainType && m.SubType == SubType
 	}
-	err := prospect.Build(flag.Arg(0), collectData, accept)
+	err := prospect.Build(flag.Arg(0), collectData(*between), accept)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func collectData(b prospect.Builder, d prospect.Data) {
-	tracer := trace.New("mkmma")
-	defer tracer.Summarize()
-	filepath.Walk(d.File, func(file string, i os.FileInfo, err error) error {
-		if err != nil || i.IsDir() || !d.Accept(file) {
-			return err
-		}
-		dat := d.Clone()
+func collectData(between time.Duration) func(prospect.Builder, prospect.Data) {
+	return func(b prospect.Builder, d prospect.Data) {
+		tracer := trace.New("mkmma")
+		defer tracer.Summarize()
+		filepath.Walk(d.File, func(file string, i os.FileInfo, err error) error {
+			if err != nil || i.IsDir() || !d.Accept(file) {
+				return err
+			}
+			dat := d.Clone()
 
-		tracer.Start(file)
+			tracer.Start(file)
 
-		if dat, err = processData(dat, file); err != nil {
-			tracer.Error(file, err)
+			if dat, err = processData(dat, file, between); err != nil {
+				tracer.Error(file, err)
+				return nil
+			}
+			if err := b.Store(dat); err != nil {
+				tracer.Error(file, err)
+			}
+			tracer.Done(file, dat)
 			return nil
-		}
-		if err := b.Store(dat); err != nil {
-			tracer.Error(file, err)
-		}
-		tracer.Done(file, dat)
-		return nil
-	})
+		})
+	}
 }
 
-func processData(d prospect.Data, file string) (prospect.Data, error) {
+func processData(d prospect.Data, file string, between time.Duration) (prospect.Data, error) {
 	if err := prospect.ReadFile(&d, file); err != nil {
 		return d, err
 	}
-	return readFile(d)
+	return readFile(d, between)
 }
 
-func readFile(d prospect.Data) (prospect.Data, error) {
+func readFile(d prospect.Data, between time.Duration) (prospect.Data, error) {
 	r, err := prospect.OpenFile(d.File)
 	if err != nil {
 		return d, err
@@ -111,7 +117,8 @@ func readFile(d prospect.Data) (prospect.Data, error) {
 	if count == 0 {
 		return d, prospect.ErrIgnore
 	}
-	d.Register(prospect.FileDuration, d.ModTime.Sub(d.AcqTime))
+	// d.Register(prospect.FileDuration, d.ModTime.Sub(d.AcqTime))
+	d.Register(prospect.FileDuration, time.Duration(count)*between)
 	d.Register(prospect.FileRecord, count)
 
 	var i int
@@ -119,6 +126,7 @@ func readFile(d prospect.Data) (prospect.Data, error) {
 		i++
 		d.Register(fmt.Sprintf(scienceRun, i), upi)
 		d.Register(fmt.Sprintf(scienceRec, i), count)
+		d.Register(fmt.Sprintf(scienceDur, i), time.Duration(count)*between)
 	}
 	return d, nil
 }
