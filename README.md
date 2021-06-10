@@ -131,6 +131,13 @@ the following elements will be replaced by their equivalent values in the config
 * **sec, second**: second of the acquisition time (2 digits)
 * **timestamp**: unix timestamp of the acquisition time (2 digits)
 
+it's also possible to use elements of the original path by using the following notation:
+
+* {index}
+* {start:}
+* {:end}
+* {start:end}
+
 some examples:
 
 ```toml
@@ -141,10 +148,13 @@ source  = "science run"
 mime    = "application/json"
 type    = "data"
 level   = 1
+file    = "/storage/mission/experiment/data/specific/file.dat"
 
 pattern1 = "archive/exp/{level}/{year}/{doy}"
 pattern2 = "{source}/{mime}/{level}/{year}/{doy}/{hour}"
 pattern3 = "archive/{model}/{source}/calibrated/{mime}/{year}/{month}/{day}"
+pattern4 = "archive/{3}"
+pattern5 = "archive/{model}/{source}/{3:4}"
 ```
 
 will produces:
@@ -153,6 +163,8 @@ will produces:
 pattern1 = archive/exp/1/2021/127
 pattern2 = ScienceRun/json/1/2021/127/11
 pattern3 = archive/FlightModel/ScienceRun/calibrated/json/2021/05/07
+pattern4 = archive/data
+pattern5 = archive/FlightModel/ScienceRun/data/specific
 ```
 
 ## Some Tips/Advices
