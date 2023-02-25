@@ -18,7 +18,7 @@ require (
 	github.com/midbel/wip v0.0.0-20200908173014-83732d414826
 	github.com/midbel/xxh v0.0.0-20200611170521-8216ee058bc7 // indirect
 	github.com/pkg/sftp v1.13.0
-	golang.org/x/crypto v0.0.0-20210503195802-e9a32991a82e
-	golang.org/x/net v0.0.0-20210505024714-0287a6fb4125
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
+	golang.org/x/net v0.7.0
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 )
